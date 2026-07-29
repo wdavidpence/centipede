@@ -53,6 +53,14 @@ let fireTimer=0;
 const OY=30; // top margin for HUD
 
 function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;}
+// BUG FIX #10: Add window resize handler during gameplay
+window.addEventListener('resize',function(){
+  resize();
+  // BUG FIX #11: Update ship y position on resize
+  if(ship&&gameState==='playing'){
+    ship.y=Math.min(ship.y,H-OY-30);
+  }
+});
 
 // === Audio engine ===
 let audioCtx=null;
@@ -105,12 +113,10 @@ function playSound(type){
 
 // === Utility functions - all use field-relative coords, convert to screen in draw ===
 function addParticles(fx,fy,color,count){
-  // Store as field-relative; draw() converts to screen
   for(let i=0;i<count;i++)particles.push({x:fx,y:fy,vx:(Math.random()-.5)*4,vy:(Math.random()-.5)*4,life:20+Math.random()*15,color,size:2+Math.random()*3});
 }
 
 function addFloatText(fx,fy,text,color){
-  // Store as field-relative; draw() converts to screen
   floatText.push({x:fx,y:fy,text:typeof text==='string'?[text]:text,color:color||'#ff0',life:60,vy:-1});
 }
 
@@ -161,7 +167,8 @@ function startGame(){
 }
 
 // === Centipede spawning (field-relative) ===
-function spawnCenti(){
+function spawnCenti(offset){
+  offset=offset||0; // BUG FIX #14: stagger multiple centipedes
   const segCount=Math.min(9+Math.floor(wave*0.8),24);
   const fromLeft=(wave%2===1);
   const dirX=fromLeft?1:-1;
@@ -172,12 +179,12 @@ function spawnCenti(){
 
   const segs=[];
   for(let i=0;i<segCount;i++){
-    // Spawn at top of field (y=5 is just below the border)
-    segs.push({x:startX-i*segGap*dirX,y:5+i*2,w:7,h:5});
+    // Spawn at top of field with offset for staggering
+    segs.push({x:startX-i*segGap*dirX,y:5+i*2+offset,w:7,h:5});
   }
   const trail=[];
   for(let i=0;i<segCount*2+10;i++){
-    trail.push({x:startX-i*spd*dirX,y:5+i*2});
+    trail.push({x:startX-i*spd*dirX,y:5+i*2+offset});
   }
   centipedes.push({segs,dirX,speed:spd,mushCooldown:0,trail});
 }
@@ -233,12 +240,17 @@ function updateCenti(c){
   // Wall bounce - reverse and drop down
   if(head.x<-10||head.x>FIELD_W+10){c.dirX*=-1;head.y+=8;}
 
-  // Body segments follow the trail
+  // BUG FIX #13: Body segments follow trail with proper spacing
   for(let i=1;i<c.segs.length;i++){
     const trailIdx=i*2;
     if(trailIdx<c.trail.length){
       c.segs[i].x=c.trail[trailIdx].x;
       c.segs[i].y=c.trail[trailIdx].y;
+    }else{
+      // If trail is too short, position behind previous segment
+      const prev=c.segs[i-1];
+      c.segs[i].x=prev.x-c.dirX*8;
+      c.segs[i].y=prev.y+2;
     }
   }
 
@@ -253,6 +265,17 @@ function updateCenti(c){
       }
     }
     if(m.centiHitTimer)m.centiHitTimer--;
+  }
+
+  // BUG FIX #19: Body segments reaching bottom become mushrooms
+  for(let i=c.segs.length-1;i>=1;i--){
+    const fieldBottom=H-OY-20;
+    if(c.segs[i].y>fieldBottom){
+      const fallen=c.segs.splice(i,1)[0];
+      // Create a new mushroom where the segment fell
+      mushrooms.push({x:fallen.x,y:fieldBottom-5,w:14,h:16,hp:4,spots:[],centiHitTimer:0});
+      addParticles(fallen.x,fallen.y,'#3a8030',4);
+    }
   }
 
   // Game over check: field-relative bottom of play area
@@ -537,8 +560,8 @@ function drawGameOver(){
   const wvText='WAVE: '+wave,wvW=ctx.measureText(wvText).width;
   ctx.fillText(wvText,W/2-wvW/2,H/2+25);
 
-  // Show high score on game over
-  if(score>=highScore&&score>0){
+  // BUG FIX #17: Show high score on game over only if strictly greater
+  if(score>highScore&&score>0){
     ctx.fillStyle='#ff0';ctx.font='bold 14px monospace';
     const nh='NEW HIGH SCORE!',nhw=ctx.measureText(nh).width;
     ctx.fillText(nh,W/2-nhw/2,H/2+50);
@@ -563,9 +586,13 @@ function checkCollisions(){
       if(Math.hypot(b.x-m.x,b.y-m.y)<m.w/2+3){
         bullets.splice(bi,1);bulletHit=true;
         m.hp--;playSound('mushroom');
+        // BUG FIX #16: Add visual feedback for mushroom damage
+        addParticles(m.x,m.y,'#3a8030',4);
         if(m.hp<=0){
           addParticles(m.x,m.y,'#3a8030',6);
           mushrooms.splice(mi,1);
+          // BUG FIX #12: Award points for destroying mushrooms
+          score+=5;addFloatText(m.x,m.y,'+5','#4f4');
         }else{m.w*=0.8;m.h*=0.8;}
       }
     }
@@ -595,13 +622,13 @@ function checkCollisions(){
           }else{
             score+=10;addParticles(seg.x,seg.y,'#cc3311',8);
             addFloatText(seg.x,seg.y,'+10','#ff8');
-            // Split: front keeps head + segments before hit, tail is segments after
-            const front=c.segs.splice(0,sk);
-            const tail=c.segs.slice(); // copy remaining segments after splice
+            // BUG FIX #9: Properly split centipede - keep front, create tail, destroy hit segment
+            const tail=c.segs.splice(sk+1); // remove and return segments after hit
+            c.segs.length=sk; // keep only front portion (0..sk-1), hit segment at index sk is removed
             if(tail.length>0){
               const newTrail=[];for(let i=0;i<tail.length*3+10;i++)newTrail.push({x:tail[0].x,y:tail[0].y});
-              // Tail continues in SAME direction (not reversed)
-              centipedes.push({segs:tail,dirX:c.dirX,speed:c.speed,mushCooldown:0,trail:newTrail});
+              // BUG FIX #15: Tail also speeds up when body is hit
+              centipedes.push({segs:tail,dirX:c.dirX,speed:c.speed*1.08,mushCooldown:0,trail:newTrail});
             }
             // Speed up remaining front centipede when body is hit
             c.speed*=1.08;playSound('hit');
@@ -658,7 +685,8 @@ function updateWaveTransition(){
 function spawnNextWave(){
   wave++;
   const numCentipedes=Math.min(wave,5);
-  for(let i=0;i<numCentipedes;i++)spawnCenti();
+  // BUG FIX #14: Stagger multiple centipedes with y offset
+  for(let i=0;i<numCentipedes;i++)spawnCenti(i*15);
 }
 
 // === Particle and float text updates ===
@@ -693,6 +721,8 @@ function loop(){
     drawFieldBorder(ox);drawGameOver();
     // Save high score on game over
     if(score>highScore){highScore=score;localStorage.setItem('centipede_highscore',highScore);}
+    // Play game over sound once
+    if(gameState!=='gameover')playSound('gameover');
     gameState='gameover';
     requestAnimationFrame(loop);return;
   }
@@ -745,7 +775,7 @@ function loop(){
 
 // === Start in attract mode ===
 window.addEventListener('load',function(){resize();gameState='attract';setTimeout(function(){loop();},300);});
-if(document.readyState==='complete'){resize();gameState='attract';setTimeout(function(){loop();},300);}
+if(document.readyState==='complete'){resize();gameState='attract';setTimeout(function(){loop();},300);};
 </script>
 </body>
 </html>
