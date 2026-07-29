@@ -1,0 +1,774 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Centipede</title>
+<style>
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#000;color:#fff;font-family:"Courier New",monospace}
+canvas{display:block;width:100%;height:100%}
+#debug{position:fixed;top:0;left:0;background:rgba(0,0,0,.8);color:#0f0;font-size:10px;padding:4px;z-index:10;white-space:pre;line-height:1.3;display:none}
+.btn{position:fixed;z-index:5;width:76px;height:76px;border-radius:50%;background:rgba(10,30,20,.8);color:#8f9;font-size:24px;display:none;align-items:center;justify-content:center}
+.left{left:12px;bottom:24px}.right{left:104px;bottom:24px}.fire{right:12px;bottom:24px}
+@media(pointer:coarse){.btn{display:flex}}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div class="btn left">&#9664;</div>
+<div class="btn right">&#9654;</div>
+<div class="btn fire">&#8226;</div>
+<script>
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+
+let W,H,ship,bullets=[],centipedes=[],mushrooms=[];
+let score=0,lives=3,wave=1,gameOver=false;
+let keys={left:false,right:false,fire:false};
+let particles=[],floatText=[];
+let waveClearMsg='',waveClearFrames=0,nextWaveDelay=0;
+
+// === Configuration - grid reduced ~30% from original 10x6/320px ===
+const FIELD_W=240;          // was 320, reduced ~25%
+const MUSH_COLS=7;          // was 10, reduced 30%
+const MUSH_ROWS=4;          // was 6, reduced 33%
+const SEG_SPACING=10;       // tight spacing so segments stay visually connected
+
+const DIR={NONE:0,LEFT:1,RIGHT:2,UP:3,DOWN:4};
+const DVEC={[DIR.LEFT]:{x:-1,y:0},[DIR.RIGHT]:{x:1,y:0},[DIR.UP]:{x:0,y:-1},[DIR.DOWN]:{x:0,y:1}};
+
+function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;}
+
+// === Utility functions ===
+function addParticles(x,y,color,count){
+  for(let i=0;i<count;i++)particles.push({x,y,vx:(Math.random()-.5)*4,vy:(Math.random()-.5)*4,life:20+Math.random()*15,color,size:2+Math.random()*3});
+}
+
+function addFloatText(x,y,text,color){
+  floatText.push({x,y,text:typeof text==='string'?[text]:text,color:color||'#ff0',life:60,vy:-1});
+}
+
+// === Input handling ===
+document.addEventListener('keydown',function(e){
+  if(e.key==='ArrowLeft')keys.left=true;
+  if(e.key==='ArrowRight')keys.right=true;
+  if(e.key===' ')keys.fire=true;
+  if(['ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();
+});
+document.addEventListener('keyup',function(e){
+  if(e.key==='ArrowLeft')keys.left=false;
+  if(e.key==='ArrowRight')keys.right=false;
+  if(e.key===' ')keys.fire=false;
+});
+
+document.querySelector('.btn.left').addEventListener('touchstart',function(e){e.preventDefault();keys.left=true;},{passive:false});
+document.querySelector('.btn.left').addEventListener('touchend',function(e){e.preventDefault();keys.left=false;},{passive:false});
+document.querySelector('.btn.right').addEventListener('touchstart',function(e){e.preventDefault();keys.right=true;},{passive:false});
+document.querySelector('.btn.right').addEventListener('touchend',function(e){e.preventDefault();keys.right=false;},{passive:false});
+document.querySelector('.btn.fire').addEventListener('touchstart',function(e){e.preventDefault();keys.fire=true;},{passive:false});
+document.querySelector('.btn.fire').addEventListener('touchend',function(e){e.preventDefault();keys.fire=false;},{passive:false});
+
+// === Game initialization ===
+function startGame(){
+  score=0;lives=3;wave=1;gameOver=false;
+  bullets=[];centipedes=[];mushrooms=[];particles=[];floatText=[];
+  waveClearMsg='';waveClearFrames=0;nextWaveDelay=0;
+  ship={x:FIELD_W/2,y:H-30};
+  spawnMush();spawnCenti();
+}
+
+// === Centipede spawning ===
+function spawnCenti(){
+  const segCount=9;
+  // Alternate entry side and direction each wave
+  const fromLeft=(wave%2===1);
+  const dirX=fromLeft?1:-1;
+  const startX=fromLeft?-5:FIELD_W+5;
+  const spd=1.2+wave*0.15; // head speed per frame
+  const segGap=8; // visual gap between segments
+  
+  const segs=[];
+  for(let i=0;i<segCount;i++){
+    // Spawn segments with proper visual spacing
+    segs.push({x:startX-i*segGap*dirX,y:-i*6-5,w:7,h:5});
+  }
+  // Position history buffer for perfect snake following
+  const trail=[];
+  for(let i=0;i<segCount*2+10;i++){
+    trail.push({x:startX-i*spd*dirX,y:-i*6-5});
+  }
+  centipedes.push({segs,dirX,speed:spd,mushCooldown:0,trail});
+}
+
+function spawnMush(){
+  const mushW=FIELD_W/MUSH_COLS;
+  for(let r=0;r<MUSH_ROWS;r++){
+    for(let c=0;c<MUSH_COLS;c++){
+      mushrooms.push({x:mushW*c+mushW/2,y:50+r*24,w:mushW*0.7,h:16,hp:4});
+    }
+  }
+}
+
+// === Centipede update - trail-based for perfect snake movement ===
+function updateCenti(c){
+  const head=c.segs[0];
+  if(!c.mushCooldown)c.mushCooldown=0;
+  
+  // Record head's current position in trail buffer (before moving)
+  if(!c.trail)c.trail=[];
+  c.trail.unshift({x:head.x,y:head.y});
+  // Keep trail bounded (enough for all segments + buffer)
+  if(c.trail.length>c.segs.length*3+20)c.trail.pop();
+  
+  // Move head horizontally
+  head.x+=c.dirX*c.speed;
+  
+  // Slow downward progression (1px every 8 frames)
+  c.mushCooldown++;
+  if(c.mushCooldown%8===0){head.y+=1;}
+  
+  // Mushroom collision - turn and drop down
+  for(let i=0;i<mushrooms.length;i++){
+    const m=mushrooms[i];
+    if(head.x+head.w/2>m.x-m.w/2&&head.x-head.w/2<m.x+m.w/2&&
+       head.y+head.h/2>m.y-m.h/2&&head.y-head.h/2<m.y+m.h/2){
+      if(c.mushCooldown>15){ // cooldown prevents rapid bouncing
+        c.dirX*=-1;head.y+=16;c.mushCooldown=0;break;
+      }
+    }
+  }
+  
+  // Wall bounce - reverse and drop down
+  if(head.x<-10||head.x>FIELD_W+10){c.dirX*=-1;head.y+=8;}
+  
+  // Body segments follow the trail - each snaps to a fixed offset in history
+  for(let i=1;i<c.segs.length;i++){
+    // Each segment follows at a fixed trail offset (maintains constant spacing)
+    const trailIdx=i*2; // 2 frames per segment gap = smooth following at ~8px spacing
+    if(trailIdx<c.trail.length){
+      c.segs[i].x=c.trail[trailIdx].x;
+      c.segs[i].y=c.trail[trailIdx].y;
+    }
+  }
+  
+  // Mushroom collision damage from all segments
+  for(let si=0;si<c.segs.length;si++){
+    const seg=c.segs[si];
+    for(let mi=mushrooms.length-1;mi>=0;mi--){
+      const m=mushrooms[mi];
+      if(Math.hypot(seg.x-m.x,seg.y-m.y)<m.w/2+4){
+        m.hp--;if(m.hp<=0)mushrooms.splice(mi,1);else{m.w*=0.75;m.h*=0.75;}
+      }
+    }
+  }
+  
+  // Game over if head reaches bottom
+  if(head.y>H-20){gameOver=true;}
+}
+
+// === Drawing functions ===
+function drawCenti(c,ox,oy){
+  const t=performance.now()/200; // animation timer
+  
+  for(let i=0;i<c.segs.length;i++){
+    const seg=c.segs[i];
+    const sx=ox+seg.x, sy=oy+seg.y;
+    
+    if(i===0){
+      // HEAD - detailed with animated antennae and directional eyes
+      const dir=c.dirX;
+      
+      // Head glow effect
+      ctx.shadowColor='#ff4422';ctx.shadowBlur=8;
+      
+      // Main head shape (rounded)
+      ctx.fillStyle='#ff4422';
+      ctx.beginPath();
+      ctx.ellipse(sx,sy,seg.w/2+1,seg.h/2+2,0,0,Math.PI*2);
+      ctx.fill();
+      
+      // Head highlight
+      ctx.fillStyle='#ff6644';
+      ctx.beginPath();
+      ctx.ellipse(sx,sy-1,seg.w/3,seg.h/4,0,Math.PI,Math.PI*2);
+      ctx.fill();
+      
+      // Antennae (animated)
+      const antWave=Math.sin(t*3)*2;
+      ctx.strokeStyle='#ff8866';ctx.lineWidth=1.5;
+      ctx.beginPath();
+      ctx.moveTo(sx-2,sy-seg.h/2);
+      ctx.quadraticCurveTo(sx-4+antWave,sy-seg.h/2-6,sx-5+antWave*1.5,sy-seg.h/2-8);
+      ctx.moveTo(sx+2,sy-seg.h/2);
+      ctx.quadraticCurveTo(sx+4-antWave,sy-seg.h/2-6,sx+5-antWave*1.5,sy-seg.h/2-8);
+      ctx.stroke();
+      
+      // Antennae tips (glowing dots)
+      ctx.fillStyle='#ffaa88';
+      ctx.beginPath();ctx.arc(sx-5+antWave*1.5,sy-seg.h/2-8,1.5,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(sx+5-antWave*1.5,sy-seg.h/2-8,1.5,0,Math.PI*2);ctx.fill();
+      
+      // Eyes (directional - look where centipede is going)
+      ctx.fillStyle='#fff';
+      const eyeOff=dir*1.5;
+      ctx.beginPath();ctx.arc(sx-3+eyeOff,sy-seg.h/4,2.5,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(sx+3+eyeOff,sy-seg.h/4,2.5,0,Math.PI*2);ctx.fill();
+      
+      // Pupils (black)
+      ctx.fillStyle='#000';
+      const pupilOff=dir*1;
+      ctx.beginPath();ctx.arc(sx-3+eyeOff+pupilOff,sy-seg.h/4,1.2,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(sx+3+eyeOff+pupilOff,sy-seg.h/4,1.2,0,Math.PI*2);ctx.fill();
+      
+      // Mouth/jaws
+      ctx.strokeStyle='#cc2200';ctx.lineWidth=1;
+      ctx.beginPath();
+      ctx.moveTo(sx-4+dir*2,sy+seg.h/4);
+      ctx.lineTo(sx-dir*3,sy+seg.h/2);
+      ctx.moveTo(sx+4+dir*2,sy+seg.h/4);
+      ctx.lineTo(sx-dir*3,sy+seg.h/2);
+      ctx.stroke();
+      
+      // Reset shadow
+      ctx.shadowBlur=0;
+      
+    }else if(i===c.segs.length-1){
+      // TAIL - tapered with animated wagging
+      const tailWag=Math.sin(t*4)*1.5;
+      
+      // Tail glow (green)
+      ctx.shadowColor='#44cc22';ctx.shadowBlur=6;
+      
+      // Main tail segment (tapered)
+      ctx.fillStyle='#44cc22';
+      ctx.beginPath();
+      ctx.moveTo(sx-seg.w/3,sy-seg.h/2);
+      ctx.lineTo(sx+seg.w/3,sy-seg.h/2);
+      ctx.quadraticCurveTo(sx+seg.w/4,sy+tailWag,sx,sy+seg.h/2);
+      ctx.quadraticCurveTo(sx-seg.w/4,sy+tailWag,sx-seg.w/3,sy-seg.h/2);
+      ctx.fill();
+      
+      // Tail highlight
+      ctx.fillStyle='#66ee44';
+      ctx.beginPath();ctx.arc(sx,sy-seg.h/4,1.5,0,Math.PI*2);ctx.fill();
+      
+      ctx.shadowBlur=0;
+      
+    }else{
+      // BODY - organic segments with banded pattern and subtle animation
+      const bodyPulse=Math.sin(t*2+i*0.5)*0.3;
+      
+      // Body glow (subtle)
+      ctx.shadowColor=i%2===0?'#cc3311':'#dd5533';ctx.shadowBlur=4;
+      
+      // Main body segment (rounded)
+      ctx.fillStyle=i%2===0?'#cc3311':'#dd5533';
+      ctx.beginPath();
+      ctx.ellipse(sx,sy,seg.w/2+bodyPulse,seg.h/2+0.5,0,0,Math.PI*2);
+      ctx.fill();
+      
+      // Body highlight (top)
+      ctx.fillStyle=i%2===0?'#ee5533':'#ff7755';
+      ctx.beginPath();
+      ctx.ellipse(sx,sy-1,seg.w/3,bodyPulse+0.5,0,Math.PI,Math.PI*2);
+      ctx.fill();
+      
+      // Body shadow (bottom)
+      ctx.fillStyle=i%2===0?'#992200':'#aa3311';
+      ctx.beginPath();
+      ctx.ellipse(sx,sy+1,seg.w/3,bodyPulse+0.5,0,0,Math.PI);
+      ctx.fill();
+      
+      // Segment connection lines (between segments)
+      if(i>0){
+        const prev=c.segs[i-1];
+        ctx.strokeStyle='#aa2200';ctx.lineWidth=1;
+        ctx.beginPath();
+        ctx.moveTo(ox+prev.x,oy+prev.y);
+        ctx.lineTo(sx,sy);
+        ctx.stroke();
+      }
+      
+      ctx.shadowBlur=0;
+    }
+  }
+}
+
+function drawMush(m,ox,oy){
+  const sx=ox+m.x, sy=oy+m.y;
+  
+  // Mushroom glow effect
+  ctx.shadowColor='#3a8030';ctx.shadowBlur=6;
+  
+  // Stem (brown)
+  ctx.fillStyle='#4a6040';
+  ctx.fillRect(sx-2,sy+1,4,m.h/2);
+  
+  // Stem highlight
+  ctx.fillStyle='#5a7050';
+  ctx.fillRect(sx-1,sy+1,2,m.h/2);
+  
+  // Cap (green dome)
+  ctx.fillStyle='#3a8030';
+  ctx.beginPath();
+  ctx.arc(sx,sy-2,m.w/2,Math.PI,Math.PI*2);
+  ctx.fill();
+  
+  // Cap highlight (top)
+  ctx.fillStyle='#4a9040';
+  ctx.beginPath();
+  ctx.arc(sx,sy-3,m.w/3,Math.PI*0.8,Math.PI*1.2);
+  ctx.fill();
+  
+  // Cap spots (white dots)
+  ctx.fillStyle='#66cc66';
+  const spotCount=Math.floor(m.w/4);
+  for(let i=0;i<spotCount;i++){
+    const angle=Math.PI+Math.random()*Math.PI;
+    const dist=m.w/4+i*1.5;
+    ctx.beginPath();
+    ctx.arc(sx+Math.cos(angle)*dist,sy-2+Math.sin(angle)*dist,1.5,0,Math.PI*2);
+    ctx.fill();
+  }
+  
+  // Cap edge (darker outline)
+  ctx.strokeStyle='#2a6020';ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.arc(sx,sy-2,m.w/2,Math.PI,Math.PI*2);
+  ctx.stroke();
+  
+  // HP indicator (small dots at bottom)
+  if(m.hp<4){
+    ctx.fillStyle='#ff4444';
+    for(let i=0;i<4-m.hp;i++){
+      ctx.beginPath();ctx.arc(sx-3+i*3,sy+m.h/2+2,1.5,0,Math.PI*2);ctx.fill();
+    }
+  }
+  
+  ctx.shadowBlur=0;
+}
+
+function drawShip(s,ox,oy){
+  const sx=ox+s.x, sy=oy+s.y;
+  
+  // Ship glow effect
+  ctx.shadowColor='#2a6aaa';ctx.shadowBlur=10;
+  
+  // Main body (blue)
+  ctx.fillStyle='#2a6aaa';
+  ctx.beginPath();
+  ctx.moveTo(sx-12,sy+10);
+  ctx.lineTo(sx-8,sy);
+  ctx.lineTo(sx+8,sy);
+  ctx.lineTo(sx+12,sy+10);
+  ctx.closePath();
+  ctx.fill();
+  
+  // Cockpit (lighter blue)
+  ctx.fillStyle='#44aaff';
+  ctx.beginPath();
+  ctx.moveTo(sx-3,sy-4);
+  ctx.lineTo(sx+3,sy-4);
+  ctx.lineTo(sx+2,sy+2);
+  ctx.lineTo(sx-2,sy+2);
+  ctx.closePath();
+  ctx.fill();
+  
+  // Cockpit highlight (cyan)
+  ctx.fillStyle='#88ccff';
+  ctx.beginPath();ctx.arc(sx,sy-2,1.5,0,Math.PI*2);ctx.fill();
+  
+  // Wings (darker blue)
+  ctx.fillStyle='#1a4a8a';
+  ctx.fillRect(sx-12,sy+6,5,4);
+  ctx.fillRect(sx+7,sy+6,5,4);
+  
+  // Engine glow (pulsing)
+  const enginePulse=Math.sin(performance.now()/100)*2;
+  ctx.fillStyle='#ff8844';
+  ctx.beginPath();ctx.arc(sx-5,sy+10,2+enginePulse/2,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(sx+5,sy+10,2+enginePulse/2,0,Math.PI*2);ctx.fill();
+  
+  // Engine flame (orange)
+  ctx.fillStyle='#ffaa22';
+  const flameLen=3+enginePulse;
+  ctx.beginPath();
+  ctx.moveTo(sx-6,sy+10);ctx.lineTo(sx-4,sy+10+flameLen);ctx.lineTo(sx-2,sy+10);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(sx+2,sy+10);ctx.lineTo(sx+4,sy+10+flameLen);ctx.lineTo(sx+6,sy+10);
+  ctx.fill();
+  
+  // Ship outline (bright blue)
+  ctx.strokeStyle='#44aaff';ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.moveTo(sx-12,sy+10);ctx.lineTo(sx-8,sy);ctx.lineTo(sx+8,sy);ctx.lineTo(sx+12,sy+10);
+  ctx.stroke();
+  
+  ctx.shadowBlur=0;
+}
+
+function drawParticles(){
+  for(let i=0;i<particles.length;i++){
+    const p=particles[i];
+    ctx.globalAlpha=p.life/35;
+    
+    // Particle glow effect
+    ctx.shadowColor=p.color;ctx.shadowBlur=4;
+    
+    // Draw as circle instead of square for better look
+    ctx.fillStyle=p.color;
+    ctx.beginPath();ctx.arc(p.x,p.y,p.size/2,0,Math.PI*2);ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  ctx.shadowBlur=0;
+}
+
+function drawFloatText(){
+  for(let i=0;i<floatText.length;i++){
+    const ft=floatText[i];
+    ctx.globalAlpha=Math.min(1,ft.life/20);
+    
+    // Text glow effect
+    ctx.shadowColor=ft.color;ctx.shadowBlur=6;
+    
+    ctx.fillStyle=ft.color;ctx.font='bold 11px monospace';
+    for(let j=0;j<ft.text.length;j++){
+      ctx.fillText(ft.text[j],ft.x,ft.y-j*13);
+    }
+  }
+  ctx.globalAlpha=1;
+  ctx.shadowBlur=0;
+}
+
+// === Background grid pattern (arcade authentic) ===
+function drawBackground(ox,oy){
+  // Subtle grid lines like the original arcade game
+  ctx.strokeStyle='rgba(30,60,30,0.3)';ctx.lineWidth=1;
+  
+  // Vertical lines every 20px
+  for(let x=ox;x<ox+FIELD_W;x+=20){
+    ctx.beginPath();ctx.moveTo(x,oy);ctx.lineTo(x,H-oy);ctx.stroke();
+  }
+  
+  // Horizontal lines every 20px
+  for(let y=oy;y<H-oy;y+=20){
+    ctx.beginPath();ctx.moveTo(ox,y);ctx.lineTo(ox+FIELD_W,y);ctx.stroke();
+  }
+  
+  // Grid intersection dots (subtle)
+  ctx.fillStyle='rgba(40,80,40,0.2)';
+  for(let x=ox;x<ox+FIELD_W;x+=20){
+    for(let y=oy;y<H-oy;y+=20){
+      ctx.beginPath();ctx.arc(x,y,1,0,Math.PI*2);ctx.fill();
+    }
+  }
+}
+
+// === Bullet drawing with glow effect ===
+function drawBullet(b,ox,oy){
+  const sx=ox+b.x, sy=oy+b.y;
+  
+  // Bullet glow (orange)
+  ctx.shadowColor='#ffa020';ctx.shadowBlur=8;
+  
+  // Main bullet (orange)
+  ctx.fillStyle='#ffa020';
+  ctx.fillRect(sx-1,sy,3,6);
+  
+  // Bullet core (bright yellow)
+  ctx.fillStyle='#ffff88';
+  ctx.fillRect(sx,sy+1,1,4);
+  
+  // Bullet trail (fading)
+  ctx.globalAlpha=0.5;ctx.fillStyle='#ff8844';
+  ctx.fillRect(sx,sy+6,1,3);
+  ctx.globalAlpha=0.25;ctx.fillStyle='#ff6622';
+  ctx.fillRect(sx,sy+9,1,2);
+  ctx.globalAlpha=1;
+  
+  ctx.shadowBlur=0;
+}
+
+// === Field border with glow effect ===
+function drawFieldBorder(ox,oy){
+  // Outer border (green)
+  ctx.strokeStyle='#336633';ctx.lineWidth=2;
+  ctx.strokeRect(ox,oy,FIELD_W,H-oy);
+  
+  // Inner border glow (subtle)
+  ctx.strokeStyle='rgba(50,100,50,0.3)';ctx.lineWidth=4;
+  ctx.strokeRect(ox+1,oy+1,FIELD_W-2,H-oy-2);
+  
+  // Corner decorations (small squares)
+  ctx.fillStyle='#448844';
+  const cs=6; // corner size
+  ctx.fillRect(ox,oy,cs,cs);ctx.fillRect(ox+FIELD_W-cs,oy,cs,cs);
+  ctx.fillRect(ox,H-oy-cs,cs,cs);ctx.fillRect(ox+FIELD_W-cs,H-oy-cs,cs,cs);
+}
+
+// === HUD with arcade styling ===
+function drawHUD(){
+  // Score (top left)
+  ctx.fillStyle='#fff';ctx.font='bold 14px monospace';
+  ctx.fillText('SCORE '+score,12,20);
+  
+  // Lives (top left below score)
+  ctx.fillStyle='#4a8';ctx.font='bold 12px monospace';
+  for(let i=0;i<lives;i++){
+    ctx.fillText('♥',12+i*16,38);
+  }
+  
+  // Wave (top right)
+  ctx.fillStyle='#4f4';ctx.font='bold 12px monospace';
+  ctx.fillText('WAVE '+wave,W-70,24);
+  
+  // High score (if we had one) - placeholder for future
+  ctx.fillStyle='#888';ctx.font='10px monospace';
+  ctx.fillText('HI-SCORE',W-80,42);
+}
+
+// === Wave clear message with animation ===
+function drawWaveClear(){
+  if(waveClearMsg&&waveClearFrames>0){
+    const pulse=Math.sin(performance.now()/100)*5;
+    
+    ctx.shadowColor='#4f4';ctx.shadowBlur=10+pulse;
+    ctx.fillStyle='#4f4';ctx.font='bold 20px monospace';
+    const tw=ctx.measureText(waveClearMsg).width;
+    ctx.fillText(waveClearMsg,W/2-tw/2,H/2-30);
+    
+    // Subtitle
+    ctx.shadowBlur=5;ctx.fillStyle='#8f8';ctx.font='bold 12px monospace';
+    const sub='ALL CLEAR!';const sw=ctx.measureText(sub).width;
+    ctx.fillText(sub,W/2-sw/2,H/2-10);
+    
+    ctx.shadowBlur=0;
+  }
+  
+  if(nextWaveDelay>0){
+    const blink=Math.sin(performance.now()/200)>0;
+    if(blink){
+      ctx.shadowColor='#ff4';ctx.shadowBlur=8;
+      ctx.fillStyle='#ff4';ctx.font='bold 16px monospace';
+      const nw='NEXT WAVE...';const nw2=ctx.measureText(nw).width;
+      ctx.fillText(nw,W/2-nw2/2,H/2);
+      ctx.shadowBlur=0;
+    }
+  }
+}
+
+// === Game over screen with arcade styling ===
+function drawGameOver(){
+  // Dark overlay
+  ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fillRect(0,0,W,H);
+  
+  // Game over text (red with glow)
+  ctx.shadowColor='#f66';ctx.shadowBlur=15;
+  ctx.fillStyle='#f66';ctx.font='bold 28px monospace';
+  const goText='GAME OVER',goW=ctx.measureText(goText).width;
+  ctx.fillText(goText,W/2-goW/2,H/2-40);
+  
+  // Score (yellow)
+  ctx.shadowColor='#ff0';ctx.shadowBlur=8;
+  ctx.fillStyle='#ff0';ctx.font='bold 14px monospace';
+  const scText='SCORE: '+score,scW=ctx.measureText(scText).width;
+  ctx.fillText(scText,W/2-scW/2,H/2);
+  
+  // Wave reached (green)
+  ctx.shadowColor='#4f4';ctx.shadowBlur=5;
+  ctx.fillStyle='#4f4';ctx.font='bold 12px monospace';
+  const wvText='WAVE: '+wave,wvW=ctx.measureText(wvText).width;
+  ctx.fillText(wvText,W/2-wvW/2,H/2+25);
+  
+  // Restart prompt (blinking)
+  const blink=Math.sin(performance.now()/300)>0;
+  if(blink){
+    ctx.shadowBlur=0;ctx.fillStyle='#888';ctx.font='10px monospace';
+    const rt='PRESS SPACE TO RESTART',rtW=ctx.measureText(rt).width;
+    ctx.fillText(rt,W/2-rtW/2,H/2+60);
+  }
+  
+  ctx.shadowBlur=0;
+}
+
+// === Restart game on space when game over ===
+document.addEventListener('keydown',function(e){
+  if(gameOver&&e.key===' '){startGame();}
+});
+
+// === Touch restart for mobile ===
+canvas.addEventListener('touchstart',function(e){
+  if(gameOver){e.preventDefault();startGame();}
+},{passive:false});
+
+// === Collision detection ===
+function checkCollisions(){
+  // Bullet-centipede collisions
+  for(let bi=bullets.length-1;bi>=0;bi--){
+    const b=bullets[bi];let bulletHit=false;
+    for(let ci=0;ci<centipedes.length&&!bulletHit;ci++){
+      const c=centipedes[ci];
+      for(let sk=c.segs.length-1;sk>=0;sk--){
+        const seg=c.segs[sk];
+        if(b.x>seg.x-seg.w/2&&b.x<seg.x+seg.w/2&&
+           b.y>seg.y-seg.h/2&&b.y<seg.y+seg.h/2){
+          bullets.splice(bi,1);bulletHit=true;
+          
+          if(c.segs.length===1){
+            // === HEAD HIT WITH NO TAIL - CENTIPEDE FULLY DESTROYED ===
+            // Bonus for destroying the last segment!
+            score+=200;
+            addParticles(seg.x,seg,'#ff4422',15);
+            addFloatText(seg.x,seg,['BONUS!','+200'],'#ff0');
+            centipedes.splice(ci,1);
+          }else if(sk===0){
+            // === HEAD HIT WITH TAIL REMAINING ===
+            score+=50;
+            addParticles(seg.x,seg,'#ff4422',10);
+            addFloatText(seg.x,seg,['HEAD!','+50'],'#f84');
+            // Remove head; remaining body becomes new centipede going OPPOSITE direction
+            c.segs.splice(0,1);
+            const newTrail=[];for(let i=0;i<c.segs.length*3+10;i++)newTrail.push({x:c.segs[0].x,y:c.segs[0].y});
+            centipedes.push({segs:c.segs.slice(),dirX:-c.dirX,speed:c.speed,mushCooldown:0,trail:newTrail});
+            c.segs=[]; // clear original so it gets cleaned up naturally
+          }else{
+            // === BODY HIT - SPLIT INTO TWO CENTIPEDES ===
+            score+=10;
+            addParticles(seg.x,seg,'#cc3311',8);
+            addFloatText(seg.x,seg,'+10','#ff8');
+            // Front portion: head + segments before hit (continues same direction)
+            const front=c.segs.splice(0,sk);
+            // Tail portion: segments after hit (becomes new centipede going OPPOSITE)
+            const tail=c.segs.splice(0);
+            if(tail.length>0){
+              const newTrail=[];for(let i=0;i<tail.length*3+10;i++)newTrail.push({x:tail[0].x,y:tail[0].y});
+              centipedes.push({segs:tail,dirX:-c.dirX,speed:c.speed,mushCooldown:0,trail:newTrail});
+            }
+          }
+          break;
+        }
+      }
+    }
+  }
+  
+  // Clean up empty centipedes
+  for(let i=centipedes.length-1;i>=0;i--){
+    if(centipedes[i].segs.length===0)centipedes.splice(i,1);
+  }
+  
+  // Ship-centipede collision
+  if(ship&&!gameOver){
+    for(let ci=0;ci<centipedes.length;ci++){
+      const c=centipedes[ci];let hit=false;
+      for(let si=0;si<c.segs.length&&!hit;si++){
+        const seg=c.segs[si];
+        if(seg.y-seg.h/2<ship.y+10&&seg.y+seg.h/2>ship.y){
+          if(ship.x>seg.x-seg.w/2-12&&ship.x<seg.x+seg.w/2+12){hit=true;}
+        }
+      }
+      if(hit){
+        lives--;addParticles(ship.x,ship.y,'#2a6aaa',12);
+        centipedes.splice(ci,1);
+        if(lives<=0){gameOver=true;}
+        else ship={x:FIELD_W/2,y:H-30};
+      }
+    }
+  }
+}
+
+// === Wave management ===
+function checkWaveClear(){
+  if(centipedes.length===0&&waveClearMsg===''&&nextWaveDelay===0&&!gameOver){
+    waveClearMsg='WAVE CLEAR!';
+    waveClearFrames=120; // display for 2 seconds
+  }
+}
+
+function updateWaveTransition(){
+  if(waveClearFrames>0){waveClearFrames--;return;}
+  if(nextWaveDelay>0){nextWaveDelay--;if(nextWaveDelay===0)spawnNextWave();}
+}
+
+function spawnNextWave(){
+  wave++;
+  const numCentipedes=Math.min(wave,5);
+  for(let i=0;i<numCentipedes;i++)spawnCenti();
+}
+
+// === Particle and float text updates ===
+function updateParticles(){
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];p.x+=p.vx;p.y+=p.vy;p.life--;
+    p.vx*=0.95;p.vy*=0.95;
+    if(p.life<=0)particles.splice(i,1);
+  }
+}
+
+function updateFloatText(){
+  for(let i=floatText.length-1;i>=0;i--){
+    const ft=floatText[i];ft.y+=ft.vy;ft.life--;
+    if(ft.life<=0)floatText.splice(i,1);
+  }
+}
+
+// === Main game loop ===
+function loop(){
+  ctx.fillStyle='#051a0a';ctx.fillRect(0,0,W,H);
+  const ox=(W-FIELD_W)/2;const oy=30;
+  
+  if(!gameOver){
+    // Ship movement
+    if(keys.left)ship.x=Math.max(12,ship.x-6);
+    if(keys.right)ship.x=Math.min(FIELD_W-12,ship.x+6);
+    
+    // Fire bullet (with rate limiting)
+    if(keys.fire&&bullets.length<5){keys.fire=false;bullets.push({x:ship.x,y:ship.y-8,dy:-10});}
+    
+    // Update centipedes
+    for(let i=centipedes.length-1;i>=0;i--)updateCenti(centipedes[i]);
+    
+    // Update bullets
+    for(let i=bullets.length-1;i>=0;i--){bullets[i].y+=bullets[i].dy;if(bullets[i].y<-10)bullets.splice(i,1);}
+    
+    // Check collisions
+    checkCollisions();
+    
+    // Update effects
+    updateParticles();updateFloatText();
+    
+    // Wave management
+    checkWaveClear();updateWaveTransition();
+    
+    // === Draw everything (layered) ===
+    drawBackground(ox,oy);
+    for(let i=0;i<mushrooms.length;i++)drawMush(mushrooms[i],ox,oy);
+    for(let i=0;i<centipedes.length;i++)drawCenti(centipedes[i],ox,oy);
+    for(let i=0;i<bullets.length;i++)drawBullet(bullets[i],ox,oy);
+    if(ship)drawShip(ship,ox,oy);
+    drawFieldBorder(ox,oy);
+    
+    // Particles and floating text (screen coords)
+    drawParticles();drawFloatText();
+    
+    // HUD and messages
+    drawHUD();drawWaveClear();
+    
+  }else{
+    // Game over - static render with effects
+    drawBackground(ox,oy);
+    for(let i=0;i<mushrooms.length;i++)drawMush(mushrooms[i],ox,oy);
+    for(let i=0;i<centipedes.length;i++)drawCenti(centipedes[i],ox,oy);
+    drawFieldBorder(ox,oy);
+    drawGameOver();
+  }
+  
+  requestAnimationFrame(loop);
+}
+
+// === Start game on load ===
+window.addEventListener('load',function(){resize();startGame();setTimeout(function(){loop();},300);});
+if(document.readyState==='complete'){resize();startGame();setTimeout(function(){loop();},300);}
+</script>
+</body>
+</html>
