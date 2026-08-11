@@ -334,7 +334,7 @@ function spawnScorpion(x,y){
     w:10, h:8,
     speed:2.0 + Math.min(wave*0.1, 1), // scorpion ~2-3px/frame (matching centipede fast)
     state: 'cocoon', // 'cocoon','emerging','moving'
-    timer: 60, // frames before emerging (1 second)
+    timer: 75, // frames before emerging (1.25 seconds)
     dirX: (Math.random()>0.5?1:-1),
     dirY: 1,
     pauseTimer: 0,
@@ -542,7 +542,7 @@ function updateSaucer(s){
       w: 10, h: 8,
       speed: 2+Math.min(wave*0.1,2),
       state: 'falling', // 'falling','jumping'
-      fallSpeed: 3,
+      fallSpeed: 3.5,
       jumpTimer: 0,
       dirX: (Math.random()>0.5?1:-1),
       animPhase: Math.random()*Math.PI*2,
@@ -744,12 +744,12 @@ function drawCenti(c){
       ctx.shadowColor=sc.centiHead;ctx.shadowBlur=8;
       ctx.strokeStyle=sc.centiHead;ctx.lineWidth=2;
 
-      // Same rectangular shape as body segments
+      // Head is slightly larger than body (original: bigger head sprite)
       ctx.beginPath();
-      ctx.rect(sx-seg.w/2-1, sy-seg.h/2, seg.w+2, seg.h);
+      ctx.rect(sx-seg.w/2-2, sy-seg.h/2-1, seg.w+4, seg.h+2);
       ctx.stroke();
 
-      // Inner fill (slightly more opaque than body to distinguish)
+      // Inner fill (more opaque than body to distinguish head)
       ctx.shadowBlur=4;
       const headRgba=sc.centiHead.replace('#','');
       ctx.fillStyle=`rgba(${parseInt(headRgba.slice(0,2),16)},${parseInt(headRgba.slice(2,4),16)},${parseInt(headRgba.slice(4,6),16)},0.5)`;
@@ -1048,8 +1048,7 @@ function drawAttract(){
   for(let i=0;i<12;i++){
     const sx=crawlX-i*12, sy=crawlY+Math.sin(t*4+i*0.5)*3;
     const p=i/12;
-    // Head uses head color, body uses head color too (like in-game)
-    const col = i===0 ? sc.centiHead : sc.centiHead;
+    const col = sc.centiHead;
     ctx.shadowColor=col;ctx.shadowBlur=6;
     ctx.strokeStyle=col;ctx.lineWidth=2;
     // Rectangular segment (matching in-game style)
