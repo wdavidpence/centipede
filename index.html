@@ -551,13 +551,13 @@ function updateSaucer(s){
     s.dropTimer=90+Math.random()*120; // cooldown before next drop
   }
 
-  // Saucer shoots at player (original mechanic)
-  if(!s.shootTimer)s.shootTimer=30+Math.random()*60;
+  // Saucer shoots at player (original mechanic) - tuned rate
+  if(!s.shootTimer)s.shootTimer=40+Math.random()*50;
   s.shootTimer--;
   if(s.shootTimer<=0){
     // Fire a bullet downward toward player
-    saucerBullets.push({x:s.x, y:s.y+10, dy:4, life:200});
-    s.shootTimer=40+Math.random()*80;
+    saucerBullets.push({x:s.x, y:s.y+10, dy:3.5, life:200});
+    s.shootTimer=50+Math.random()*70;
   }
 
   // Remove if off screen
