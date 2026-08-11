@@ -1028,17 +1028,21 @@ function drawAttract(){
   ctx.save();ctx.translate(attractOX,fieldTop);ctx.scale(attractScale,attractScale);
   drawBackground();drawFieldBorder();
 
-  // Crawling demo centipede (field-relative)
+  // Crawling demo centipede (field-relative, rectangular segments)
   const crawlY=FIELD_H*0.35;
   const crawlX=(t*30)%((FIELD_W+60))-30;
+  const sc=getSC();
   for(let i=0;i<12;i++){
     const sx=crawlX-i*12, sy=crawlY+Math.sin(t*4+i*0.5)*3;
     const p=i/12;
-    const r=Math.round(255*(1-p)), g=Math.round(100+155*p);
-    const col=`rgb(${r},${g},20)`;
-    ctx.shadowColor=col;ctx.shadowBlur=8-i*0.5;
+    // Head uses head color, body uses head color too (like in-game)
+    const col = i===0 ? sc.centiHead : sc.centiHead;
+    ctx.shadowColor=col;ctx.shadowBlur=6;
     ctx.strokeStyle=col;ctx.lineWidth=2;
-    ctx.beginPath();ctx.ellipse(sx,sy,5+i*0.1,4,0,0,Math.PI*2);ctx.stroke();
+    // Rectangular segment (matching in-game style)
+    ctx.beginPath();ctx.rect(sx-4,sy-3,8,6);ctx.stroke();
+    ctx.fillStyle=`rgba(255,50,50,${0.3*(1-p)})`;
+    ctx.fillRect(sx-2,sy-1.5,4,3);
   }
   ctx.shadowBlur=0;
   ctx.restore();
