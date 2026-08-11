@@ -215,7 +215,7 @@ function spawnCenti(offset){
   const segs=[];
   for(let i=0;i<segCount;i++){
     // Spawn at top of field with offset for staggering
-    segs.push({x:startX-i*segGap*dirX,y:5+i*2+offset,w:8,h:5});
+    segs.push({x:startX-i*segGap*dirX,y:5+i*2+offset,w:8,h:6});
   }
   const trail=[];
   for(let i=0;i<segCount*3+10;i++){
@@ -427,8 +427,8 @@ function drawScorpion(s){
 
   if(s.state==='cocoon'){
     // Cocoon: pulsating centipede head remnant
-    const pulse=Math.sin(t*2)*3;
-    ctx.shadowColor='#ff4400';ctx.shadowBlur=8+pulse;
+    const pulse=Math.sin(t*3)*4;
+    ctx.shadowColor='#ff4400';ctx.shadowBlur=10+pulse;
     ctx.strokeStyle='#ff4400';ctx.lineWidth=2;
     ctx.beginPath();ctx.arc(sx,sy,6+pulse/2,0,Math.PI*2);ctx.stroke();
     ctx.fillStyle='rgba(255,68,0,0.3)';
@@ -746,7 +746,7 @@ function drawCenti(c){
 
       // Head is slightly larger than body (original: bigger head sprite)
       ctx.beginPath();
-      ctx.rect(sx-seg.w/2-3, sy-seg.h/2-1.5, seg.w+6, seg.h+3);
+      ctx.rect(sx-seg.w/2-4, sy-seg.h/2-2, seg.w+8, seg.h+4);
       ctx.stroke();
 
       // Inner fill (more opaque than body to distinguish head)
@@ -767,7 +767,7 @@ function drawCenti(c){
 
       // Smaller rectangle than body segments, offset by wag
       ctx.beginPath();
-      ctx.rect(sx+tailWag-seg.w/3, sy-seg.h/3, seg.w*0.66, seg.h*0.66);
+      ctx.rect(sx+tailWag-seg.w/2.5, sy-seg.h/2.5, seg.w*0.8, seg.h*0.8);
       ctx.stroke();
 
       // Inner fill
@@ -1187,11 +1187,13 @@ function checkCollisions(){
           bullets.splice(bi,1);bulletHit=true;
 
           if(c.segs.length===1){
-            score+=200;addParticles(seg.x,seg.y,'#ff4422',15);
+            score+=200;addParticles(seg.x,seg.y,'#ff4422',25,8);
             addFloatText(seg.x,seg.y,['BONUS!','+200'],'#ff0');
             centipedes.splice(ci,1);playSound('explode');playSound('bonus');
+            // Screen flash on bonus kill
+            ctx.fillStyle='rgba(255,100,50,0.2)';ctx.fillRect(0,0,W/H*FIELD_W,FIELD_H);
           }else if(sk===0){
-            score+=100;addParticles(seg.x,seg.y,'#ff4422',10);
+            score+=100;addParticles(seg.x,seg.y,'#ff4422',20,6);
             addFloatText(seg.x,seg.y,['HEAD!','+100'],'#f84');
             // Spawn scorpion from destroyed head (wave 2+)
             if(wave>=2)spawnScorpion(seg.x,seg.y);
@@ -1230,7 +1232,7 @@ function checkCollisions(){
       const s=scorpions[si];
       if(s.state==='moving'&&Math.hypot(b.x-s.x,b.y-s.y)<8){
         bullets.splice(bi,1);scorpionHit=true;
-        score+=100;addParticles(s.x,s.y,'#ff6600',15);
+        score+=100;addParticles(s.x,s.y,'#ff6600',20,5);
         addFloatText(s.x,s.y,['SCORPION','+100'],'#fa0');
         scorpions.splice(si,1);playSound('explode');
       }
@@ -1244,7 +1246,7 @@ function checkCollisions(){
       const s=saucers[si];
       if(Math.hypot(b.x-s.x,b.y-(s.y))<16){
         bullets.splice(bi,1);saucerHit=true;
-        score+=250;addParticles(s.x,s.y,'#ff00ff',20);
+        score+=250;addParticles(s.x,s.y,'#ffcc00',20,6);
         addFloatText(s.x,s.y,['SAUCER','+250'],'#f0f');
         saucers.splice(si,1);playSound('explode');
       }
@@ -1258,7 +1260,7 @@ function checkCollisions(){
       const s=spiders[si];
       if(s.state==='jumping'&&Math.hypot(b.x-s.x,b.y-s.y)<8){
         bullets.splice(bi,1);spiderHit=true;
-        score+=75;addParticles(s.x,s.y,'#ff00aa',12);
+        score+=75;addParticles(s.x,s.y,'#ff00aa',16,5);
         addFloatText(s.x,s.y,['SPIDER','+75'],'#f0a');
         spiders.splice(si,1);playSound('hit');
       }
