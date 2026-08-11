@@ -1003,11 +1003,20 @@ function drawShip(s){
 
 function drawParticles(){
   for(let i=0;i<particles.length;i++){
-    const p=particles[i];ctx.globalAlpha=p.life/35;
-    ctx.shadowColor=p.color;ctx.shadowBlur=6;
+    const p=particles[i];ctx.globalAlpha=Math.min(1,p.life/20);
+    // Multi-layer particle: outer glow + inner bright core
+    ctx.shadowColor=p.color;ctx.shadowBlur=10;
     ctx.fillStyle=p.color;
-    // Convert field-relative to screen coords
-    ctx.beginPath();ctx.arc(p.x,p.y,p.size/2,0,Math.PI*2);ctx.fill();
+    // Main particle body
+    ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();
+    // Bright core (white-hot center)
+    ctx.fillStyle='rgba(255,255,255,'+ctx.globalAlpha*0.7+')';
+    ctx.shadowBlur=4;
+    ctx.beginPath();ctx.arc(p.x,p.y,p.size*0.4,0,Math.PI*2);ctx.fill();
+    // Spark trail (small line behind particle)
+    ctx.strokeStyle=p.color;ctx.lineWidth=1.5;ctx.shadowBlur=3;
+    ctx.globalAlpha*=0.5;
+    ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x-p.vx*2,p.y-p.vy*2);ctx.stroke();
   }
   ctx.globalAlpha=1;ctx.shadowBlur=0;
 }
@@ -1145,6 +1154,11 @@ function drawCRTOverlay(){
     ctx.fillStyle=`rgba(0,0,0,${Math.max(0,1-crtTurnOnProgress)})`;
     ctx.fillRect(0,0,W,H);
   }
+
+  // CRT flicker (subtle power hum effect - random brightness variation)
+  const flickerAlpha=0.01+Math.random()*0.015;
+  ctx.fillStyle=`rgba(0,0,0,${flickerAlpha})`;
+  ctx.fillRect(0,0,W,H);
 
   // Scanlines over barrel-distorted image
   if(scanlinePattern){
