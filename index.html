@@ -679,7 +679,13 @@ function drawSaucer(s){
   ctx.beginPath();ctx.arc(sx-5,sy+6,1.5,0,Math.PI*2);ctx.fill();
   ctx.beginPath();ctx.arc(sx+5,sy+6,1.5,0,Math.PI*2);ctx.fill();
 
-  ctx.shadowBlur=0;
+  
+
+  // Engine glow underneath dome (subtle blue-white exhaust)
+  const enginePulse=Math.sin(t*5)*0.3+0.5;
+  ctx.fillStyle=`rgba(150,200,255,${enginePulse*0.4})`;ctx.shadowColor='#88ccff';ctx.shadowBlur=12;
+  ctx.beginPath();ctx.ellipse(sx,sy+6,8,3,0,0,Math.PI*2);ctx.fill();
+  ctx.shadowBlur=0;ctx.shadowBlur=0;
 }
 
 // === Spider mechanics ===
@@ -1211,6 +1217,18 @@ function drawCRTOverlay(){
       }
     }
   }
+  crtCtx2d.putImageData(dst,0,0);
+
+  // Subtle RGB color separation on screen edges (real CRT fringing quirk)
+  const rgbEdge=2; // pixel width of edge fringing
+  for(let ch=0;ch<2;ch++){
+    const offX=rgbEdge*(ch===0?1:-1);
+    crtCtx2d.globalCompositeOperation='lighter';
+    crtCtx2d.globalAlpha=0.03; // very subtle
+    crtCtx2d.drawImage(canvas,offX,0);
+  }
+  crtCtx2d.globalAlpha=1;
+  crtCtx2d.globalCompositeOperation='source-over';
   crtCtx2d.putImageData(dst,0,0);
 
   // Draw CRT-processed image back to main canvas
