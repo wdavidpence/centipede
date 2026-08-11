@@ -671,6 +671,11 @@ function drawSaucer(s){
   ctx.lineWidth=2;
   ctx.beginPath();ctx.ellipse(sx,sy+2,18,4,0,0,Math.PI*2);ctx.stroke();
 
+  // Cockpit window (small oval in center of disc)
+  ctx.strokeStyle='rgba(255,255,255,0.6)';ctx.lineWidth=1;ctx.shadowColor='#fff';ctx.shadowBlur=4;
+  ctx.beginPath();ctx.ellipse(sx,sy+2,6,2,0,0,Math.PI*2);ctx.stroke();
+  ctx.fillStyle='rgba(100,200,255,0.3)';ctx.fill();
+
   // Saucer underside (subtle)
   ctx.strokeStyle='rgba(255,204,0,0.4)';ctx.lineWidth=1;
   ctx.beginPath();ctx.ellipse(sx,sy+4,12,3,0,0,Math.PI);ctx.stroke();
