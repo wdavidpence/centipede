@@ -198,9 +198,10 @@ function spawnCenti(offset){
   const fromLeft=(wave%2===1);
   const dirX=fromLeft?1:-1;
   const startX=fromLeft?-5:FIELD_W+5;
-  // Original Centipede: odd waves are fast, even waves are slow
+  // Original Centipede: odd waves fast, even waves slow
   const isFastWave = (wave % 2 === 1);
-  const spd = isFastWave ? 1.5 + Math.min(wave,20)*0.06 : 0.7 + Math.min(wave,20)*0.04;
+  // Fast waves: ~2px/frame, slow waves: ~0.75px/frame (authentic pacing)
+  const spd = isFastWave ? 2.0 : 0.75;
   const segGap=8;
 
   const segs=[];
