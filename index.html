@@ -752,17 +752,8 @@ function drawCenti(c){
       // Inner fill (more opaque than body to distinguish head)
       ctx.shadowBlur=4;
       const headRgba=sc.centiHead.replace('#','');
-      ctx.fillStyle=`rgba(${parseInt(headRgba.slice(0,2),16)},${parseInt(headRgba.slice(2,4),16)},${parseInt(headRgba.slice(4,6),16)},0.5)`;
+      ctx.fillStyle=`rgba(${parseInt(headRgba.slice(0,2),16)},${parseInt(headRgba.slice(2,4),16)},${parseInt(headRgba.slice(4,6),16)},0.7)`;
       ctx.fillRect(sx-seg.w/3, sy-seg.h/4, seg.w*0.66, seg.h*0.5);
-
-      // Small antennae (original head had tiny feelers)
-      ctx.shadowBlur=3;
-      const antWave=Math.sin(t*3)*2;
-      ctx.strokeStyle=sc.centiHead;ctx.lineWidth=1;
-      ctx.beginPath();
-      ctx.moveTo(sx-2,sy-seg.h/2);ctx.lineTo(sx-3+antWave,sy-seg.h/2-4);
-      ctx.moveTo(sx+2,sy-seg.h/2);ctx.lineTo(sx+3-antWave,sy-seg.h/2-4);
-      ctx.stroke();
 
       ctx.shadowBlur=0;
     }else if(i===c.segs.length-1){
@@ -847,13 +838,13 @@ function drawMush(m){
   ctx.fillStyle=`rgba(${parseInt(mushRgba.slice(0,2),16)},${parseInt(mushRgba.slice(2,4),16)},${parseInt(mushRgba.slice(4,6),16)},0.25)`;
   ctx.beginPath();ctx.arc(sx,sy,m.w/2,Math.PI,0);ctx.fill();
 
-  // Spots (white dots on cap)
-  ctx.shadowBlur=4;ctx.fillStyle='#fff';
+  // Spots (white dots on cap) - original had 1-3 spots
+  ctx.shadowBlur=3;ctx.fillStyle='rgba(255,255,255,0.8)';
   if(m.spots){
     for(let i=0;i<m.spots.length;i++){
       const sp=m.spots[i];
       ctx.beginPath();
-      ctx.arc(sx+Math.cos(sp.angle)*sp.dist,sy+Math.sin(sp.angle)*sp.dist*0.5-2,1.5,0,Math.PI*2);
+      ctx.arc(sx+Math.cos(sp.angle)*sp.dist,sy+Math.sin(sp.angle)*sp.dist*0.5-3,2,0,Math.PI*2);
       ctx.fill();
     }
   }
@@ -929,16 +920,21 @@ function drawBackground(){
 function drawBullet(b){
   const sx=b.x, sy=b.y;
 
-  // Original: bright vertical dart with yellow-orange glow
-  ctx.shadowColor='#ffaa22';ctx.shadowBlur=8;
-  ctx.strokeStyle='#ffcc44';ctx.lineWidth=2;
+  // Original: bright white/yellow dart with glow trail
+  ctx.shadowColor='#ffffff';ctx.shadowBlur=12;
+  ctx.strokeStyle='#ffffff';ctx.lineWidth=3;
 
-  // Main dart body
-  ctx.beginPath();ctx.moveTo(sx,sy-10);ctx.lineTo(sx,sy+4);ctx.stroke();
+  // Main dart (bright white line)
+  ctx.beginPath();ctx.moveTo(sx,sy-12);ctx.lineTo(sx,sy+6);ctx.stroke();
+
+  // Glow trail (subtle)
+  ctx.shadowBlur=8;
+  ctx.strokeStyle='rgba(255,200,50,0.6)';ctx.lineWidth=5;
+  ctx.beginPath();ctx.moveTo(sx,sy-8);ctx.lineTo(sx,sy+4);ctx.stroke();
 
   // Bright tip
-  ctx.fillStyle='#ffffff';ctx.shadowBlur=6;
-  ctx.beginPath();ctx.arc(sx,sy-10,2,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#ffffff';ctx.shadowBlur=10;
+  ctx.beginPath();ctx.arc(sx,sy-12,2.5,0,Math.PI*2);ctx.fill();
 }
 
 // === Field border with glow effect ===
@@ -1424,7 +1420,7 @@ function loop(){
   if(invincibleTimer>0)invincibleTimer--;
 
   // Extra life every 10000 points
-  if(score-extraLifeScore>=10000){extraLifeScore+=10000;lives=Math.min(lives+1,9);addFloatText(ship.x,ship.y-20,['EXTRA LIFE!'],'#4f4');playSound('waveclear');}
+  if(score-extraLifeScore>=10000){extraLifeScore+=10000;lives=Math.min(lives+1,9);addFloatText(ship.x,ship.y-20,['1UP'],'#4f4');playSound('bonus');}
 
   // Update effects
   updateParticles();updateFloatText();
@@ -1442,14 +1438,14 @@ function loop(){
   for(let i=0;i<spiders.length;i++)drawSpider(spiders[i]);
   for(let i=0;i<saucers.length;i++)drawSaucer(saucers[i]);
   for(let i=0;i<bullets.length;i++)drawBullet(bullets[i]);
-  // Draw saucer bullets (field-relative)
+  // Draw saucer bullets (field-relative) - original: red/orange downward bolts
   for(let i=0;i<saucerBullets.length;i++){
     const sb=saucerBullets[i];
-    ctx.shadowColor='#ff4400';ctx.shadowBlur=8;
-    ctx.strokeStyle='#ff4400';ctx.lineWidth=2;
-    ctx.beginPath();ctx.moveTo(sb.x,sb.y-4);ctx.lineTo(sb.x,sb.y+4);ctx.stroke();
-    ctx.fillStyle='#ff8844';
-    ctx.beginPath();ctx.arc(sb.x,sb.y+4,2,0,Math.PI*2);ctx.fill();
+    ctx.shadowColor='#ff0000';ctx.shadowBlur=10;
+    ctx.strokeStyle='#ff2200';ctx.lineWidth=3;
+    ctx.beginPath();ctx.moveTo(sb.x,sb.y-6);ctx.lineTo(sb.x,sb.y+6);ctx.stroke();
+    ctx.fillStyle='#ffaa00';ctx.shadowBlur=6;
+    ctx.beginPath();ctx.arc(sb.x,sb.y+6,2.5,0,Math.PI*2);ctx.fill();
     ctx.shadowBlur=0;
   }
   if(ship)drawShip(ship);
