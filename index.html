@@ -747,30 +747,21 @@ function drawCenti(c){
 
       ctx.shadowBlur=0;
     }else if(i===c.segs.length-1){
-      // === TAIL: Vector-style tapered end ===
+      // === TAIL: Slightly smaller oval with gentle wag (original style) ===
       const tailWag=Math.sin(t*4)*2;
       const sc=getSC();
 
-      ctx.shadowColor=sc.centiTail;ctx.shadowBlur=10;
+      ctx.shadowColor=sc.centiTail;ctx.shadowBlur=8;
       ctx.strokeStyle=sc.centiTail;ctx.lineWidth=2;
 
-      // Tapered tail shape
-      ctx.beginPath();
-      ctx.moveTo(sx-seg.w/3,sy-seg.h/2);
-      ctx.lineTo(sx+seg.w/3,sy-seg.h/2);
-      ctx.quadraticCurveTo(sx+seg.w/4+tailWag,sy,sx+tailWag*2,sy+seg.h/2);
-      ctx.quadraticCurveTo(sx-seg.w/4+tailWag,sy,sx-seg.w/3,sy-seg.h/2);
-      ctx.stroke();
+      // Smaller oval than body segments
+      ctx.beginPath();ctx.ellipse(sx+tailWag,sy,seg.w/3,seg.h/3+1,0,0,Math.PI*2);ctx.stroke();
 
-      // Inner glow
-      ctx.shadowBlur=5;
+      // Inner fill
+      ctx.shadowBlur=4;
       const tailRgba=sc.centiTail.replace('#','');
-      ctx.fillStyle=`rgba(${parseInt(tailRgba.slice(0,2),16)},${parseInt(tailRgba.slice(2,4),16)},${parseInt(tailRgba.slice(4,6),16)},0.3)`;
-      ctx.beginPath();ctx.arc(sx+tailWag*0.5,sy,seg.w/4,0,Math.PI*2);ctx.fill();
-
-      // Tail tip glow
-      ctx.fillStyle='#88ff44';
-      ctx.beginPath();ctx.arc(sx+tailWag*2,sy+seg.h/2,1.5,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle=`rgba(${parseInt(tailRgba.slice(0,2),16)},${parseInt(tailRgba.slice(2,4),16)},${parseInt(tailRgba.slice(4,6),16)},0.4)`;
+      ctx.beginPath();ctx.arc(sx+tailWag,sy,seg.w/4,0,Math.PI*2);ctx.fill();
 
       ctx.shadowBlur=0;
     }else{
