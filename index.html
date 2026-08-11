@@ -77,7 +77,11 @@ function resize(){
   // Generate scanline pattern
   if(!scanlineCanvas){scanlineCanvas=document.createElement('canvas');scanlineCtx=scanlineCanvas.getContext('2d');}
   scanlineCanvas.width=W;scanlineCanvas.height=H;
-  for(let y=0;y<H;y+=2){scanlineCtx.fillStyle='rgba(0,0,0,0.15)';scanlineCtx.fillRect(0,y,W,1);}
+  for(let y=0;y<H;y+=2){
+    // Subtle scanline hum: slight brightness variation (real CRT power supply ripple)
+    const humAlpha=0.12+Math.sin(y*0.05)*0.03;
+    scanlineCtx.fillStyle=`rgba(0,0,0,${humAlpha})`;scanlineCtx.fillRect(0,y,W,1);
+  }
   scanlinePattern=scanlineCtx.createPattern(scanlineCanvas,'repeat');
   // Offscreen buffer for barrel distortion
   if(!crtOffscreen){crtOffscreen=document.createElement('canvas');crtCtx2d=crtOffscreen.getContext('2d');}
@@ -628,6 +632,7 @@ function updateSaucer(s){
   if(s.shootTimer<=0){
     // Fire a bullet downward toward player
     saucerBullets.push({x:s.x, y:s.y+10, dy:3.5, life:250});
+    addParticles(s.x,s.y+10,['#ffcc00','#fff'],4,2);
     s.shootTimer=50+Math.random()*70;
   }
 
@@ -892,9 +897,10 @@ function drawCenti(c){
       ctx.shadowColor=sc.centiHead;ctx.shadowBlur=headPulse;
       ctx.strokeStyle=sc.centiHead;ctx.lineWidth=2.5;
 
-      // Head body - rectangular, wider than body segments
+      // Head body - rectangular, wider than body segments with breathing pulse
+      const breathe=Math.sin(performance.now()/300)*1.5;
       ctx.beginPath();
-      ctx.rect(sx-seg.w/2-4, sy-seg.h/2-2, seg.w+8, seg.h+4);
+      ctx.rect(sx-seg.w/2-4-breathe*0.3, sy-seg.h/2-2-breathe*0.3, seg.w+8+breathe*0.6, seg.h+4+breathe*0.6);
       ctx.stroke();
 
       // Inner fill (opaque to distinguish head)
