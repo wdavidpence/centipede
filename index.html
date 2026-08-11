@@ -263,7 +263,7 @@ function updateCenti(c){
   // Move head horizontally
   head.x+=c.dirX*c.speed;
 
-  // Slow downward progression (original: 2px every 8 frames for more dramatic descent)
+  // Slow downward progression (original: 2px every 8 frames)
   c.mushCooldown++;
   if(c.mushCooldown%8===0){head.y+=2;}
 
@@ -277,7 +277,7 @@ function updateCenti(c){
   }
 
   // Wall bounce - reverse and drop down (original dropped more at walls)
-  if(head.x<-10||head.x>FIELD_W+10){c.dirX*=-1;head.y+=10;}
+  if(head.x<-10||head.x>FIELD_W+10){c.dirX*=-1;head.y+=12;}
 
   // BUG FIX #13: Body segments follow trail with proper spacing
   for(let i=1;i<c.segs.length;i++){
