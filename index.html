@@ -954,6 +954,18 @@ const STAGE_COLORS = [
 ];
 function getSC(){return STAGE_COLORS[(wave-1)%STAGE_COLORS.length];}
 
+// Authentic Atari color gradient: head color -> tail color, interpolated per segment
+function getSegmentColor(i,total){
+  const sc=getSC();
+  const headRgba=sc.centiHead.replace('#','');
+  const tailRgba=sc.centiTail.replace('#','');
+  const hr=parseInt(headRgba.slice(0,2),16), hg=parseInt(headRgba.slice(2,4),16), hb=parseInt(headRgba.slice(4,6),16);
+  const tr=parseInt(tailRgba.slice(0,2),16), tg=parseInt(tailRgba.slice(2,4),16), tb=parseInt(tailRgba.slice(4,6),16);
+  const p=total>1?i/(total-1):0; // 0=head, 1=tail
+  const r=Math.round(hr+(tr-hr)*p), g=Math.round(hg+(tg-hg)*p), b=Math.round(hb+(tb-hb)*p);
+  return `rgba(${r},${g},${b},0.5)`;
+}
+
 function drawCenti(c){
   const t=performance.now()/200;
 
@@ -980,10 +992,10 @@ function drawCenti(c){
       ctx.rect(sx-seg.w/2-4-breathe*0.3, sy-seg.h/2-2-breathe*0.3, seg.w+8+breathe*0.6, seg.h+4+breathe*0.6);
       ctx.stroke();
 
-      // Inner fill (opaque to distinguish head)
+      // Inner fill (opaque to distinguish head) with authentic color gradient
       ctx.shadowBlur=4;
-      const headRgba=sc.centiHead.replace('#','');
-      ctx.fillStyle=`rgba(${parseInt(headRgba.slice(0,2),16)},${parseInt(headRgba.slice(2,4),16)},${parseInt(headRgba.slice(4,6),16)},0.7)`;
+      const segColor=getSegmentColor(i,c.segs.length);
+      ctx.fillStyle=segColor;
       ctx.fillRect(sx-seg.w/3, sy-seg.h/4, seg.w*0.66, seg.h*0.5);
 
       // Antennae (2 thin lines waving from front of head)
