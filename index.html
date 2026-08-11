@@ -1143,7 +1143,7 @@ function drawGameOver(){
 
   const blink=Math.sin(performance.now()/300)>0;
   if(blink){ctx.shadowBlur=0;ctx.fillStyle='#aaa';ctx.font='bold 14px monospace';
-    const rt='PRESS SPACE OR TAP',rtW=ctx.measureText(rt).width;
+    const rt='PRESS SPACE OR TAP TO START',rtW=ctx.measureText(rt).width;
     ctx.fillText(rt,W/2-rtW/2,H/2+95);}
   ctx.shadowBlur=0;
 }
