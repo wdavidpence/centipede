@@ -565,15 +565,15 @@ function drawSaucer(s){
   const sx=s.x, sy=s.y;
   const t=s.animPhase;
 
-  // Glow
-  ctx.shadowColor='#ff00ff';ctx.shadowBlur=12;
+  // Glow (original saucer was yellow/gold, not purple)
+  ctx.shadowColor='#ffcc00';ctx.shadowBlur=12;
 
   // Saucer body (vector-style dome)
-  ctx.strokeStyle='#ff00ff';ctx.lineWidth=2;
+  ctx.strokeStyle='#ffcc00';ctx.lineWidth=2;
   ctx.beginPath();
   ctx.ellipse(sx,sy,15,6,0,Math.PI,0); // top dome
   ctx.stroke();
-  ctx.fillStyle='rgba(255,0,255,0.2)';
+  ctx.fillStyle='rgba(255,204,0,0.2)';
   ctx.fill();
 
   // Base ring
@@ -586,7 +586,7 @@ function drawSaucer(s){
   ctx.beginPath();ctx.arc(sx,sy-2,2,0,Math.PI*2);ctx.fill();
 
   // Edge lights
-  ctx.fillStyle=`rgba(255,100,255,${0.3+lightPulse*0.4})`;
+  ctx.fillStyle=`rgba(255,204,0,${0.3+lightPulse*0.4})`;
   ctx.beginPath();ctx.arc(sx-12,sy,1.5,0,Math.PI*2);ctx.fill();
   ctx.beginPath();ctx.arc(sx+12,sy,1.5,0,Math.PI*2);ctx.fill();
 
