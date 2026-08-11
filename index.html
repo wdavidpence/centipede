@@ -923,10 +923,9 @@ function drawParticles(){
 function drawFloatText(){
   for(let i=0;i<floatText.length;i++){
     const ft=floatText[i];ctx.globalAlpha=Math.min(1,ft.life/20);
-    ctx.shadowColor=ft.color;ctx.shadowBlur=8;
-    ctx.fillStyle=ft.color;ctx.font='bold 12px monospace';
-    // Convert field-relative to screen coords
-    for(let j=0;j<ft.text.length;j++){ctx.fillText(ft.text[j],ft.x,ft.y-j*14);}
+    ctx.shadowColor=ft.color;ctx.shadowBlur=10;
+    ctx.fillStyle=ft.color;ctx.font='bold 14px monospace';
+    for(let j=0;j<ft.text.length;j++){ctx.fillText(ft.text[j],ft.x,ft.y-j*16);}
   }
   ctx.globalAlpha=1;ctx.shadowBlur=0;
 }
