@@ -34,6 +34,7 @@ let impactFlash=0;
 let scanlineCanvas,scanlineCtx,scanlinePattern;
 let crtOffscreen,crtCtx2d; // Offscreen buffer for CRT barrel distortion
 let crtTurnOnProgress=1; // 1=fully on, animates from 0 when game starts
+let crtPowerOffProgress=0; // 1=fully off (black line), animates from 0 on game over
 
 function triggerShake(intensity){screenShakeDecay=intensity||5;}
 function triggerFlash(frames){impactFlash=frames||8;}
@@ -230,6 +231,7 @@ function startGame(){
   ship={x:FIELD_W/2,y:FIELD_H-30};
   spawnMush();spawnCenti();
   crtTurnOnProgress=0; // Trigger CRT turn-on animation
+  crtPowerOffProgress=0;
   gameState='playing';
 }
 
@@ -345,9 +347,9 @@ function updateCenti(c){
     const fieldBottom=FIELD_H-20;
     if(c.segs[i].y>fieldBottom){
       const fallen=c.segs.splice(i,1)[0];
-      // Create a new mushroom where the segment fell
-      mushrooms.push({x:fallen.x,y:fieldBottom-5,w:14,h:16,hp:4,spots:[],centiHitTimer:0});
-      addParticles(fallen.x,fallen.y,'#3a8030',4);
+      // Create a new mushroom with growth animation (starts small, grows to full size)
+      mushrooms.push({x:fallen.x,y:fieldBottom-5,w:4,h:5,hp:4,spots:[],centiHitTimer:0,growthTarget:1,growProgress:0});
+      addParticles(fallen.x,fallen.y,'#3a8030',6);
     }
   }
 
@@ -917,6 +919,12 @@ function drawMush(m){
   const sx=m.x, sy=m.y;
   const sc=getSC();
 
+  // Growth animation: mushrooms grow from small to full size
+  if(m.growProgress!==undefined&&m.growProgress<1){
+    m.growProgress+=0.05;
+    if(m.growProgress>=1){m.growProgress=1;m.w=m.growthTarget||m.w;m.h=m.growthTarget?m.h*1.5:m.h;}
+  }
+
   // Authentic Atari mushroom: bitmap-style cap + stem + spots
   const mushRgba=sc.mush.replace('#','');
   const mr=parseInt(mushRgba.slice(0,2),16);
@@ -1173,6 +1181,23 @@ function drawCRTOverlay(){
   ctx.fillStyle=vg;
   ctx.fillRect(0,0,W,H);
 
+  // CRT power-off effect (screen collapses to horizontal line)
+  if(crtPowerOffProgress>0&&crtPowerOffProgress<1){
+    const squeeze=1-crtPowerOffProgress*0.95; // vertical squeeze 1->0.05
+    const brightness=1-crtPowerOffProgress*0.7; // dimming
+    ctx.save();
+    ctx.translate(0,H/2);ctx.scale(1,squeeze);ctx.translate(0,-H/2);
+    ctx.drawImage(crtOffscreen,0,0);
+    ctx.restore();
+    // Bright white horizontal line at center
+    const lineAlpha=crtPowerOffProgress*0.8;
+    ctx.fillStyle=`rgba(255,255,255,${lineAlpha})`;
+    ctx.fillRect(0,H/2-2,W,4);
+    // Overall dimming
+    ctx.fillStyle=`rgba(0,0,0,${1-brightness})`;
+    ctx.fillRect(0,0,W,H);
+  }
+
   // CRT monitor bezel mask (rounded corners like real CRT display)
   ctx.globalCompositeOperation='destination-out';
   const cornerR=Math.min(W,H)*0.04; // corner radius as % of screen
@@ -1413,6 +1438,19 @@ function drawAttract(){
   ctx.fillStyle=sc.centiHead;ctx.shadowBlur=10;
   ctx.beginPath();ctx.arc(frontX+crawlDir*5, headSy-9+antWave,1.5,0,Math.PI*2);ctx.fill();
   ctx.beginPath();ctx.arc(frontX+crawlDir*4, headSy-7-antWave,1.5,0,Math.PI*2);ctx.fill();
+  ctx.shadowBlur=0;
+  // Flying saucer demo (sweeping across top of field)
+  const saucerX=(t*60)%((FIELD_W+100))-50;
+  const saucerY=20;
+  ctx.shadowColor='#ffcc00';ctx.shadowBlur=14;
+  ctx.strokeStyle='#ffcc00';ctx.lineWidth=2.5;
+  ctx.beginPath();ctx.ellipse(saucerX,saucerY-2,18,8,0,Math.PI,0);ctx.stroke();
+  ctx.fillStyle='rgba(255,204,0,0.15)';ctx.fill();
+  ctx.lineWidth=2;
+  ctx.beginPath();ctx.ellipse(saucerX,saucerY+2,18,4,0,0,Math.PI*2);ctx.stroke();
+  const sLightPulse=Math.sin(t*3)*0.5+0.5;
+  ctx.fillStyle=`rgba(255,255,255,${0.5+sLightPulse*0.5})`;ctx.shadowBlur=10;
+  ctx.beginPath();ctx.arc(saucerX,saucerY-4,2.5,0,Math.PI*2);ctx.fill();
   ctx.shadowBlur=0;
   ctx.restore();
 
@@ -1756,6 +1794,7 @@ function loop(){
 
   // Handle game over state (before gameplay update)
   if(gameOver){
+    crtPowerOffProgress=Math.max(0,crtPowerOffProgress-0.02); // Ensure it resets if we restart
     // Save high score on game over
     if(score>highScore){highScore=score;localStorage.setItem('centipede_highscore',highScore);}
     if(gameState!=='gameover')playSound('gameover');
@@ -1771,6 +1810,8 @@ function loop(){
     for(let i=0;i<saucers.length;i++)drawSaucer(saucers[i]);
     for(let i=0;i<spiders.length;i++)drawSpider(spiders[i]);
     drawFieldBorder();
+    // CRT power-off animation: screen collapses to horizontal line
+    if(crtPowerOffProgress<1){crtPowerOffProgress+=0.025;}
     drawCRTOverlay(); // Apply CRT to game over too
     drawHUD();
     drawGameOver();
