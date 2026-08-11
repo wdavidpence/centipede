@@ -926,26 +926,20 @@ function drawBackground(){
   ctx.fillStyle='#000';ctx.fillRect(0,0,FIELD_W,FIELD_H);
 }
 
-// === Bullet drawing with glow effect (field-relative) ===
+// === Bullet drawing (field-relative) ===
 function drawBullet(b){
   const sx=b.x, sy=b.y;
 
-  // Vector-style bullet (bright line with glow)
-  ctx.shadowColor='#ffaa22';ctx.shadowBlur=10;
-  ctx.strokeStyle='#ffaa22';ctx.lineWidth=2;
-  ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx,sy-8);ctx.stroke();
+  // Original: bright vertical dart with yellow-orange glow
+  ctx.shadowColor='#ffaa22';ctx.shadowBlur=8;
+  ctx.strokeStyle='#ffcc44';ctx.lineWidth=2;
 
-  // Bullet core (bright white)
-  ctx.shadowBlur=6;
-  ctx.fillStyle='#ffff88';
-  ctx.beginPath();ctx.arc(sx,sy-4,1.5,0,Math.PI*2);ctx.fill();
+  // Main dart body
+  ctx.beginPath();ctx.moveTo(sx,sy-10);ctx.lineTo(sx,sy+4);ctx.stroke();
 
-  // Trail effect
-  ctx.globalAlpha=0.5;ctx.strokeStyle='#ff8844';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(sx,sy+2);ctx.lineTo(sx,sy+8);ctx.stroke();
-  ctx.globalAlpha=0.25;
-  ctx.beginPath();ctx.moveTo(sx,sy+8);ctx.lineTo(sx,sy+12);ctx.stroke();
-  ctx.globalAlpha=1;ctx.shadowBlur=0;
+  // Bright tip
+  ctx.fillStyle='#ffffff';ctx.shadowBlur=6;
+  ctx.beginPath();ctx.arc(sx,sy-10,2,0,Math.PI*2);ctx.fill();
 }
 
 // === Field border with glow effect ===
