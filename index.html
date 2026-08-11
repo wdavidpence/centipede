@@ -42,8 +42,8 @@ let extraLifeScore=0;
 
 // Configuration - all coordinates are FIELD-RELATIVE (origin at top-left of play area)
 const FIELD_W=240;
-const MUSH_COLS=7;
-const MUSH_ROWS=4;
+const GRID_COLS=30;
+const GRID_ROWS=28;
 
 // Fire rate config
 const FIRE_COOLDOWN=8;
@@ -70,41 +70,54 @@ function playSound(type){
     const now=ac.currentTime;
     if(type==='shoot'){
       const o=ac.createOscillator();const g=ac.createGain();o.type='square';
-      o.frequency.setValueAtTime(800,now);o.frequency.exponentialRampToValueAtTime(200,now+0.1);
-      g.gain.setValueAtTime(0.1,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.1);
-      o.connect(g).connect(ac.destination);o.start(now);o.stop(now+0.1);
+      o.frequency.setValueAtTime(1200,now);o.frequency.exponentialRampToValueAtTime(400,now+0.08);
+      g.gain.setValueAtTime(0.08,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.08);
+      o.connect(g).connect(ac.destination);o.start(now);o.stop(now+0.08);
     }else if(type==='explode'){
-      const bufSize=ac.sampleRate*0.2;const buf=ac.createBuffer(1,bufSize,ac.sampleRate);
-      const d=buf.getChannelData(0);for(let i=0;i<bufSize;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/bufSize,2);
+      const bufSize=ac.sampleRate*0.3;const buf=ac.createBuffer(1,bufSize,ac.sampleRate);
+      const d=buf.getChannelData(0);for(let i=0;i<bufSize;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/bufSize,3);
       const s=ac.createBufferSource();const g=ac.createGain();s.buffer=buf;
-      g.gain.setValueAtTime(0.15,now);s.connect(g).connect(ac.destination);s.start(now);
+      g.gain.setValueAtTime(0.2,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.3);
+      s.connect(g).connect(ac.destination);s.start(now);
     }else if(type==='hit'){
-      const o=ac.createOscillator();const g=ac.createGain();o.type='sawtooth';
-      o.frequency.setValueAtTime(400,now);o.frequency.exponentialRampToValueAtTime(100,now+0.15);
-      g.gain.setValueAtTime(0.12,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.15);
-      o.connect(g).connect(ac.destination);o.start(now);o.stop(now+0.15);
+      const o=ac.createOscillator();const g=ac.createGain();o.type='square';
+      o.frequency.setValueAtTime(600,now);o.frequency.exponentialRampToValueAtTime(150,now+0.12);
+      g.gain.setValueAtTime(0.1,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.12);
+      o.connect(g).connect(ac.destination);o.start(now);o.stop(now+0.12);
     }else if(type==='waveclear'){
-      [523,659,784,1047].forEach((f,i)=>{
+      [523,659,784,1047,1318].forEach((f,i)=>{
         const o=ac.createOscillator();const g=ac.createGain();o.type='square';o.frequency.value=f;
-        g.gain.setValueAtTime(0.08,now+i*0.12);g.gain.exponentialRampToValueAtTime(0.001,now+i*0.12+0.1);
-        o.connect(g).connect(ac.destination);o.start(now+i*0.12);o.stop(now+i*0.12+0.12);
+        g.gain.setValueAtTime(0.07,now+i*0.1);g.gain.exponentialRampToValueAtTime(0.001,now+i*0.1+0.15);
+        o.connect(g).connect(ac.destination);o.start(now+i*0.1);o.stop(now+i*0.1+0.15);
       });
     }else if(type==='gameover'){
-      [400,350,300,200].forEach((f,i)=>{
+      [400,350,300,250,200].forEach((f,i)=>{
         const o=ac.createOscillator();const g=ac.createGain();o.type='sawtooth';o.frequency.value=f;
-        g.gain.setValueAtTime(0.1,now+i*0.2);g.gain.exponentialRampToValueAtTime(0.001,now+i*0.2+0.18);
-        o.connect(g).connect(ac.destination);o.start(now+i*0.2);o.stop(now+i*0.2+0.2);
+        g.gain.setValueAtTime(0.1,now+i*0.25);g.gain.exponentialRampToValueAtTime(0.001,now+i*0.25+0.2);
+        o.connect(g).connect(ac.destination);o.start(now+i*0.25);o.stop(now+i*0.25+0.22);
       });
     }else if(type==='hurt'){
       const o=ac.createOscillator();const g=ac.createGain();o.type='sawtooth';
-      o.frequency.setValueAtTime(300,now);o.frequency.exponentialRampToValueAtTime(50,now+0.3);
-      g.gain.setValueAtTime(0.15,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.3);
-      o.connect(g).connect(ac.destination);o.start(now);o.stop(now+0.3);
+      o.frequency.setValueAtTime(400,now);o.frequency.exponentialRampToValueAtTime(80,now+0.4);
+      g.gain.setValueAtTime(0.15,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.4);
+      o.connect(g).connect(ac.destination);o.start(now);o.stop(now+0.4);
     }else if(type==='mushroom'){
       const o=ac.createOscillator();const g=ac.createGain();o.type='triangle';
-      o.frequency.setValueAtTime(600,now);o.frequency.exponentialRampToValueAtTime(300,now+0.05);
-      g.gain.setValueAtTime(0.06,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.05);
-      o.connect(g).connect(ac.destination);o.start(now);o.stop(now+0.05);
+      o.frequency.setValueAtTime(800,now);o.frequency.exponentialRampToValueAtTime(400,now+0.04);
+      g.gain.setValueAtTime(0.05,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.04);
+      o.connect(g).connect(ac.destination);o.start(now);o.stop(now+0.04);
+    }else if(type==='saucer'){
+      const o=ac.createOscillator();const g=ac.createGain();o.type='sine';
+      o.frequency.setValueAtTime(300,now);o.frequency.linearRampToValueAtTime(600,now+0.15);
+      o.frequency.linearRampToValueAtTime(300,now+0.3);
+      g.gain.setValueAtTime(0.06,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.3);
+      o.connect(g).connect(ac.destination);o.start(now);o.stop(now+0.3);
+    }else if(type==='bonus'){
+      [784,988,1175,1568].forEach((f,i)=>{
+        const o=ac.createOscillator();const g=ac.createGain();o.type='square';o.frequency.value=f;
+        g.gain.setValueAtTime(0.08,now+i*0.08);g.gain.exponentialRampToValueAtTime(0.001,now+i*0.08+0.1);
+        o.connect(g).connect(ac.destination);o.start(now+i*0.08);o.stop(now+i*0.08+0.12);
+      });
     }
   }catch(e){}
 }
@@ -188,23 +201,27 @@ function spawnCenti(offset){
 }
 
 function spawnMush(){
-  const mushW=FIELD_W/MUSH_COLS;
-  // Mushrooms positioned within visible field area (field-relative y)
-  const startY=40; // start below the top border area
-  for(let r=0;r<MUSH_ROWS;r++){
-    for(let c=0;c<MUSH_COLS;c++){
-      // Pre-compute mushroom spot positions (seeded by position) to avoid flickering
-      const spots=[];
-      let seed=c*100+r*7+42;
-      const spotCount=Math.floor(mushW*0.7/4);
-      for(let s=0;s<spotCount;s++){
-        seed=(seed*1103515245+12345)&0x7fffffff;
-        const angle=Math.PI+(seed%360)/360*Math.PI;
-        seed=(seed*1103515245+12345)&0x7fffffff;
-        const dist=mushW*0.7/4+s*1.5;
-        spots.push({angle,dist});
+  // Grid-based mushroom placement for authentic ~65% density
+  const cellW=FIELD_W/GRID_COLS;
+  const cellH=(H-OY*2-60)/GRID_ROWS; // leave room for HUD and player zone
+  const startY=35;
+
+  for(let r=0;r<GRID_ROWS-3;r++){ // leave bottom 3 rows clear for player
+    for(let c=0;c<GRID_COLS;c++){
+      // Seeded random: ~65% fill, with some empty spaces for movement paths
+      let seed=r*GRID_COLS+c+42;
+      seed=(seed*1103515245+12345)&0x7fffffff;
+      if((seed%100)<65){
+        const spots=[];
+        for(let s=0;s<3;s++){
+          seed=(seed*1103515245+12345)&0x7fffffff;
+          const angle=Math.PI+(seed%360)/360*Math.PI;
+          seed=(seed*1103515245+12345)&0x7fffffff;
+          const dist=cellW*0.3+s*1.2;
+          spots.push({angle,dist});
+        }
+        mushrooms.push({x:c*cellW+cellW/2,y:startY+r*cellH,w:cellW*0.8,h:cellH*0.9,hp:4,spots,centiHitTimer:0});
       }
-      mushrooms.push({x:mushW*c+mushW/2,y:startY+r*30,w:mushW*0.7,h:16,hp:4,spots});
     }
   }
 }
@@ -662,6 +679,18 @@ function drawSpider(s,ox){
 
   ctx.shadowBlur=0;
 }
+// === Color cycling per stage (arcade authentic) ===
+// Original Atari cycled through color palettes every stage.
+const STAGE_COLORS = [
+  {centiHead:'#ff2200', centiTail:'#44ff22', mush:'#00ff44', border:'#00ff44'},
+  {centiHead:'#ff8800', centiTail:'#22ffaa', mush:'#44ff88', border:'#44ff88'},
+  {centiHead:'#ff0088', centiTail:'#88ff44', mush:'#88ff44', border:'#88ff44'},
+  {centiHead:'#00ff88', centiTail:'#44aaff', mush:'#44ffaa', border:'#44ffaa'},
+  {centiHead:'#44aaff', centiTail:'#ff44aa', mush:'#aaff44', border:'#aaff44'},
+  {centiHead:'#ffaa44', centiTail:'#44ff88', mush:'#ffaa44', border:'#ffaa44'},
+];
+function getSC(){return STAGE_COLORS[(wave-1)%STAGE_COLORS.length];}
+
 function drawCenti(c,ox){
   const t=performance.now()/200;
 
@@ -673,17 +702,19 @@ function drawCenti(c,ox){
     if(i===0){
       // === HEAD: Vector-style with antennae and eyes ===
       const dir=c.dirX;
+      const sc=getSC();
 
       // Outer glow (vector-style neon)
-      ctx.shadowColor='#ff2200';ctx.shadowBlur=12;
-      ctx.strokeStyle='#ff2200';ctx.lineWidth=2;
+      ctx.shadowColor=sc.centiHead;ctx.shadowBlur=12;
+      ctx.strokeStyle=sc.centiHead;ctx.lineWidth=2;
 
       // Head shape - elongated oval
       ctx.beginPath();ctx.ellipse(sx,sy,seg.w/2+2,seg.h/2+3,0,0,Math.PI*2);ctx.stroke();
 
       // Inner fill with gradient
       ctx.shadowBlur=6;
-      ctx.fillStyle='rgba(255,34,0,0.4)';
+      const headRgba=sc.centiHead.replace('#','');
+      ctx.fillStyle=`rgba(${parseInt(headRgba.slice(0,2),16)},${parseInt(headRgba.slice(2,4),16)},${parseInt(headRgba.slice(4,6),16)},0.4)`;
       ctx.beginPath();ctx.ellipse(sx,sy,seg.w/3,seg.h/3,0,0,Math.PI*2);ctx.fill();
 
       // Animated antennae (vector lines)
@@ -726,9 +757,10 @@ function drawCenti(c,ox){
     }else if(i===c.segs.length-1){
       // === TAIL: Vector-style tapered end ===
       const tailWag=Math.sin(t*4)*2;
+      const sc=getSC();
 
-      ctx.shadowColor='#44ff22';ctx.shadowBlur=10;
-      ctx.strokeStyle='#44ff22';ctx.lineWidth=2;
+      ctx.shadowColor=sc.centiTail;ctx.shadowBlur=10;
+      ctx.strokeStyle=sc.centiTail;ctx.lineWidth=2;
 
       // Tapered tail shape
       ctx.beginPath();
@@ -740,7 +772,8 @@ function drawCenti(c,ox){
 
       // Inner glow
       ctx.shadowBlur=5;
-      ctx.fillStyle='rgba(68,255,34,0.3)';
+      const tailRgba=sc.centiTail.replace('#','');
+      ctx.fillStyle=`rgba(${parseInt(tailRgba.slice(0,2),16)},${parseInt(tailRgba.slice(2,4),16)},${parseInt(tailRgba.slice(4,6),16)},0.3)`;
       ctx.beginPath();ctx.arc(sx+tailWag*0.5,sy,seg.w/4,0,Math.PI*2);ctx.fill();
 
       // Tail tip glow
@@ -805,22 +838,24 @@ function drawCenti(c,ox){
 
 function drawMush(m,ox){
   const sx=ox+m.x, sy=OY+m.y;
+  const sc=getSC();
 
   // Vector-style mushroom with glow
-  ctx.shadowColor='#00ff44';ctx.shadowBlur=8;
+  ctx.shadowColor=sc.mush;ctx.shadowBlur=8;
 
   // Stem (vector lines)
-  ctx.strokeStyle='#44aa44';ctx.lineWidth=2;
+  ctx.strokeStyle=sc.mush;ctx.lineWidth=2;
   ctx.beginPath();ctx.moveTo(sx-2,sy+2);ctx.lineTo(sx-2,sy+m.h/2);ctx.stroke();
   ctx.beginPath();ctx.moveTo(sx+2,sy+2);ctx.lineTo(sx+2,sy+m.h/2);ctx.stroke();
 
   // Cap outline (vector arc)
-  ctx.strokeStyle='#00ff44';ctx.lineWidth=2;
+  ctx.strokeStyle=sc.mush;ctx.lineWidth=2;
   ctx.shadowBlur=10;
   ctx.beginPath();ctx.arc(sx,sy,m.w/2,Math.PI,0);ctx.stroke();
 
   // Cap fill (subtle glow)
-  ctx.fillStyle='rgba(0,255,68,0.2)';
+  const mushRgba=sc.mush.replace('#','');
+  ctx.fillStyle=`rgba(${parseInt(mushRgba.slice(0,2),16)},${parseInt(mushRgba.slice(2,4),16)},${parseInt(mushRgba.slice(4,6),16)},0.2)`;
   ctx.beginPath();ctx.arc(sx,sy,m.w/2,Math.PI,0);ctx.fill();
 
   // Spots on cap (white dots)
@@ -960,16 +995,18 @@ function drawBullet(b,ox){
 
 // === Field border with glow effect ===
 function drawFieldBorder(ox){
+  const sc=getSC();
   // Outer border
-  ctx.strokeStyle='#00ff44';ctx.lineWidth=2;ctx.shadowColor='#00ff44';ctx.shadowBlur=8;
+  ctx.strokeStyle=sc.border;ctx.lineWidth=2;ctx.shadowColor=sc.border;ctx.shadowBlur=8;
   ctx.strokeRect(ox,OY,FIELD_W,H-OY*2);
 
   // Inner border (subtle)
-  ctx.strokeStyle='rgba(0,255,68,0.3)';ctx.lineWidth=1;ctx.shadowBlur=4;
+  const brgba=sc.border.replace('#','');
+  ctx.strokeStyle=`rgba(${parseInt(brgba.slice(0,2),16)},${parseInt(brgba.slice(2,4),16)},${parseInt(brgba.slice(4,6),16)},0.3)`;ctx.lineWidth=1;ctx.shadowBlur=4;
   ctx.strokeRect(ox+2,OY+2,FIELD_W-4,H-OY*2-4);
 
   // Corner decorations
-  ctx.fillStyle='#00ff44';ctx.shadowBlur=6;const cs=5;
+  ctx.fillStyle=sc.border;ctx.shadowBlur=6;const cs=5;
   ctx.fillRect(ox,OY,cs,cs);ctx.fillRect(ox+FIELD_W-cs,OY,cs,cs);
   ctx.fillRect(ox,H-OY-cs,cs,cs);ctx.fillRect(ox+FIELD_W-cs,H-OY-cs,cs,cs);
 
@@ -1000,39 +1037,58 @@ function drawAttract(){
   const ox=(W-FIELD_W)/2;
   drawBackground(ox);drawFieldBorder(ox);
 
-  // Title with glow - vector style
+  // Animated centipede crawling across title screen
   const t=performance.now()/300;
   const pulse=Math.sin(t)*0.3+0.7;
 
+  // Crawling demo centipede on screen
+  const crawlY=H*0.45;
+  const crawlX=(t*30)%((FIELD_W+60))-30;
+  const crawlSegs=12;
+  for(let i=0;i<crawlSegs;i++){
+    const sx=ox+crawlX-i*12, sy=crawlY+Math.sin(t*4+i*0.5)*3;
+    const p=i/crawlSegs;
+    const r=Math.round(255*(1-p)), g=Math.round(100+155*p);
+    const col=`rgb(${r},${g},20)`;
+    ctx.shadowColor=col;ctx.shadowBlur=8-i*0.5;
+    ctx.strokeStyle=col;ctx.lineWidth=2;
+    ctx.beginPath();ctx.ellipse(sx,sy,5+i*0.1,4,0,0,Math.PI*2);ctx.stroke();
+  }
+  ctx.shadowBlur=0;
+
+  // Title with glow - vector style
   ctx.shadowColor='#ff2200';ctx.shadowBlur=20*pulse;
   ctx.strokeStyle='#ff2200';ctx.lineWidth=3;
   ctx.font='bold 36px monospace';
   const title='CENTIPEDE',tw=ctx.measureText(title).width;
-  ctx.strokeText(title,W/2-tw/2,H*0.3);
+  ctx.strokeText(title,W/2-tw/2,H*0.25);
 
   // Inner fill
   ctx.shadowBlur=10*pulse;
   ctx.fillStyle='rgba(255,34,0,0.3)';
-  ctx.fillText(title,W/2-tw/2,H*0.3);
+  ctx.fillText(title,W/2-tw/2,H*0.25);
 
   // Subtitle
   ctx.shadowBlur=5;ctx.strokeStyle='#8f8';ctx.lineWidth=1.5;
   ctx.font='bold 14px monospace';
   const sub='ATARI ARCADE',sw=ctx.measureText(sub).width;
-  ctx.strokeText(sub,W/2-sw/2,H*0.3+35);
+  ctx.strokeText(sub,W/2-sw/2,H*0.25+35);
   ctx.fillStyle='rgba(136,255,136,0.3)';
-  ctx.fillText(sub,W/2-sw/2,H*0.3+35);
+  ctx.fillText(sub,W/2-sw/2,H*0.25+35);
 
-  // Instructions
-  ctx.shadowBlur=0;ctx.fillStyle='#888';ctx.font='11px monospace';
-  const lines=['ARROW KEYS: MOVE','SPACE: FIRE','','TOUCH CONTROLS ON MOBILE'];
-  lines.forEach((l,i)=>ctx.fillText(l,W/2-ctx.measureText(l).width/2,H*0.5+i*20));
+  // Score table (arcade authentic)
+  ctx.shadowBlur=0;ctx.fillStyle='#aaa';ctx.font='11px monospace';
+  const scores=[['CENTIPEDE SEGMENT','10'],['CENTIPEDE HEAD','50'],['SCORPION','100'],['SPIDER','75'],['FLYING SAUCER','250']];
+  scores.forEach((s,i)=>{
+    ctx.fillStyle='#888';ctx.fillText(s[0],W/2-140,H*0.58+i*18);
+    ctx.fillStyle='#ff4';ctx.fillText(s[1],W/2+120,H*0.58+i*18);
+  });
 
   // High score
   if(highScore>0){
     ctx.fillStyle='#ff0';ctx.font='bold 14px monospace';ctx.shadowColor='#ff0';ctx.shadowBlur=6;
     const hs='HIGH SCORE: '+highScore,hsw=ctx.measureText(hs).width;
-    ctx.fillText(hs,W/2-hsw/2,H*0.72);ctx.shadowBlur=0;
+    ctx.fillText(hs,W/2-hsw/2,H*0.78);ctx.shadowBlur=0;
   }
 
   // Blinking start prompt
@@ -1041,9 +1097,9 @@ function drawAttract(){
     ctx.shadowColor='#ff4';ctx.shadowBlur=10;
     ctx.strokeStyle='#ff4';ctx.lineWidth=2;ctx.font='bold 16px monospace';
     const start='PRESS SPACE OR TAP',startw=ctx.measureText(start).width;
-    ctx.strokeText(start,W/2-startw/2,H*0.88);
+    ctx.strokeText(start,W/2-startw/2,H*0.9);
     ctx.fillStyle='rgba(255,255,68,0.3)';
-    ctx.fillText(start,W/2-startw/2,H*0.88);
+    ctx.fillText(start,W/2-startw/2,H*0.9);
   }
   ctx.shadowBlur=0;
 }
@@ -1149,7 +1205,7 @@ function checkCollisions(){
           if(c.segs.length===1){
             score+=200;addParticles(seg.x,seg.y,'#ff4422',15);
             addFloatText(seg.x,seg.y,['BONUS!','+200'],'#ff0');
-            centipedes.splice(ci,1);playSound('explode');
+            centipedes.splice(ci,1);playSound('explode');playSound('bonus');
           }else if(sk===0){
             score+=50;addParticles(seg.x,seg.y,'#ff4422',10);
             addFloatText(seg.x,seg.y,['HEAD!','+50'],'#f84');
