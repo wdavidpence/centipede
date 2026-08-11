@@ -345,7 +345,7 @@ function updateCenti(c){
     const m=mushrooms[mi];
     if(Math.hypot(seg.x-m.x,seg.y-m.y)<m.w/2+4){
       if(!m.centiHitTimer||m.centiHitTimer<=0){
-        m.hp--;if(m.hp<=0){mushrooms.splice(mi,1);addParticles(m.x,m.y,'#3a8030',6);}else{m.w*=0.75;m.h*=0.75;}
+        m.hp--;if(m.hp<=0){mushrooms.splice(mi,1);addParticles(m.x,m.y,['#3a8030','#4a9040','#6ab050'],10);}else{m.w*=0.75;m.h*=0.75;addParticles(m.x,m.y,['#3a8030','#4a9040'],4);}
         m.centiHitTimer=30; // 30-frame cooldown per mushroom
       }
     }
@@ -645,6 +645,16 @@ function drawSaucer(s){
   ctx.beginPath();
   ctx.ellipse(sx,sy-2,18,8,0,Math.PI,0); // top dome
   ctx.stroke();
+
+  // Pulsing rim lights around dome edge
+  for(let rl=0;rl<6;rl++){
+    const angle=Math.PI+rl*Math.PI/5; // distribute along dome arc
+    const rx=sx+Math.cos(angle)*16;
+    const ry=sy-2+Math.sin(angle)*6;
+    const rpulse=Math.sin(t*4+rl*0.8)*0.5+0.5;
+    ctx.fillStyle=`rgba(255,255,200,${rpulse*0.8})`;ctx.shadowColor='#fff';ctx.shadowBlur=6;
+    ctx.beginPath();ctx.arc(rx,ry,1.5+rpulse,0,Math.PI*2);ctx.fill();
+  }
 
   // Dome fill with gradient
   const domeGrad=ctx.createRadialGradient(sx,sy-6,2,sx,sy-2,18);
