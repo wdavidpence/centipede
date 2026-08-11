@@ -194,7 +194,7 @@ function startGame(){
 // === Centipede spawning (field-relative) ===
 function spawnCenti(offset){
   offset=offset||0;
-  const segCount=Math.min(9+Math.floor(wave*0.8),24);
+  const segCount=Math.min(15+wave*2,24); // original: 15 on wave 1, +2 per wave, max 24
   const fromLeft=(wave%2===1);
   const dirX=fromLeft?1:-1;
   const startX=fromLeft?-5:FIELD_W+5;
@@ -1393,7 +1393,7 @@ function loop(){
   for(let i=scorpions.length-1;i>=0;i--)updateScorpion(scorpions[i]);
 
   // Saucer spawning (wave 3+)
-  if(wave>=3){saucerTimer++;if(saucerTimer>=SAUCER_INTERVAL){spawnSaucer();saucerTimer=0;}}
+  if(wave>=1){saucerTimer++;if(saucerTimer>=SAUCER_INTERVAL){spawnSaucer();saucerTimer=0;}}
 
   // Update saucers
   for(let i=saucers.length-1;i>=0;i--){updateSaucer(saucers[i]);if(!saucers[i].alive)saucers.splice(i,1);}
