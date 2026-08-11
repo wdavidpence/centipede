@@ -495,7 +495,6 @@ function drawScorpion(s){
   ctx.beginPath();ctx.arc(sx+2,sy-3,1.5,0,Math.PI*2);ctx.fill();
 
   ctx.shadowBlur=0;
-  ctx.restore();
 }
 
 // === Flying Saucer mechanics ===
@@ -584,7 +583,6 @@ function drawSaucer(s){
   ctx.beginPath();ctx.arc(sx+12,sy,1.5,0,Math.PI*2);ctx.fill();
 
   ctx.shadowBlur=0;
-  ctx.restore();
 }
 
 // === Spider mechanics ===
@@ -705,7 +703,6 @@ function drawSpider(s){
   }
 
   ctx.shadowBlur=0;
-  ctx.restore();
 }
 // === Color cycling per stage (arcade authentic) ===
 // Original Atari cycled through color palettes every stage.
@@ -860,7 +857,6 @@ function drawMush(m){
 
   // Damage indicators (original didn't show damage, mushrooms just shrank)
   ctx.shadowBlur=0;
-  ctx.restore();
 }
 
 function drawShip(s){
@@ -900,7 +896,6 @@ function drawShip(s){
   ctx.beginPath();ctx.arc(sx,sy-16,1,0,Math.PI*2);ctx.fill();
 
   ctx.shadowBlur=0;
-  ctx.restore();
 }
 
 function drawParticles(){
@@ -969,7 +964,6 @@ function drawFieldBorder(){
   ctx.fillRect(0,FIELD_H-cs,cs,cs);ctx.fillRect(FIELD_W-cs,FIELD_H-cs,cs,cs);
 
   ctx.shadowBlur=0;
-  ctx.restore();
 }
 
 // === HUD with arcade styling ===
@@ -1144,7 +1138,6 @@ function drawGameOver(){
     const rt='PRESS SPACE OR TAP',rtW=ctx.measureText(rt).width;
     ctx.fillText(rt,W/2-rtW/2,H/2+85);}
   ctx.shadowBlur=0;
-  ctx.restore();
 }
 
 // === Collision detection (all field-relative) ===
