@@ -28,6 +28,14 @@ let keys={left:false,right:false,fire:false};
 let particles=[],floatText=[];
 let waveClearMsg='',waveClearFrames=0,nextWaveDelay=0;
 
+// CRT visual engine
+let screenShakeX=0,screenShakeY=0,screenShakeDecay=0;
+let impactFlash=0;
+let scanlineCanvas,scanlineCtx,scanlinePattern;
+
+function triggerShake(intensity){screenShakeDecay=intensity||5;}
+function triggerFlash(frames){impactFlash=frames||8;}
+
 // Game state machine
 let gameState='attract'; // 'attract','playing','gameover'
 
@@ -62,6 +70,11 @@ function resize(){
   const availW=W-40, availH=H-OY*2;
   SCALE=Math.min(availW/FIELD_W, availH/FIELD_H, 4); // max 4x
   OX=(W-FIELD_W*SCALE)/2;
+  // Generate scanline pattern
+  if(!scanlineCanvas){scanlineCanvas=document.createElement('canvas');scanlineCtx=scanlineCanvas.getContext('2d');}
+  scanlineCanvas.width=W;scanlineCanvas.height=H;
+  for(let y=0;y<H;y+=2){scanlineCtx.fillStyle='rgba(0,0,0,0.15)';scanlineCtx.fillRect(0,y,W,1);}
+  scanlinePattern=scanlineCtx.createPattern(scanlineCanvas,'repeat');
 }
 window.addEventListener('resize',function(){
   resize();
@@ -78,57 +91,72 @@ function playSound(type){
   try{
     const ac=getAudio();if(!ac)return;
     const now=ac.currentTime;
+    // TMS9919-style: 3 voice square waves + noise generator, limited to 8 frequencies per channel
+    // We simulate with oscillators + noise buffer + low-pass filter for authentic chip sound
+    const lp=ac.createBiquadFilter();lp.type='lowpass';lp.frequency.value=4000;
+    lp.connect(ac.destination);
     if(type==='shoot'){
-      // Original: short square wave burst
-      const o=ac.createOscillator();const g=ac.createGain();o.type='square';
-      o.frequency.setValueAtTime(800,now);o.frequency.exponentialRampToValueAtTime(200,now+0.06);
-      g.gain.setValueAtTime(0.1,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.06);
-      o.connect(g).connect(ac.destination);o.start(now);o.stop(now+0.06);
-    }else if(type==='explode'){
-      // Original: longer noise burst for centipede death
-      const bufSize=ac.sampleRate*0.4;const buf=ac.createBuffer(1,bufSize,ac.sampleRate);
-      const d=buf.getChannelData(0);for(let i=0;i<bufSize;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/bufSize,2);
+      // TMS9919: noise burst (channel D), very short, bright
+      const bufSize=ac.sampleRate*0.04;const buf=ac.createBuffer(1,bufSize,ac.sampleRate);
+      const d=buf.getChannelData(0);for(let i=0;i<bufSize;i++)d[i]=(Math.random()*2-1);
       const s=ac.createBufferSource();const g=ac.createGain();s.buffer=buf;
-      g.gain.setValueAtTime(0.25,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.4);
-      s.connect(g).connect(ac.destination);s.start(now);
+      g.gain.setValueAtTime(0.15,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.04);
+      s.connect(g).connect(lp);s.start(now);
+    }else if(type==='explode'){
+      // TMS9919: noise sweep + descending tone
+      const bufSize=ac.sampleRate*0.5;const buf=ac.createBuffer(1,bufSize,ac.sampleRate);
+      const d=buf.getChannelData(0);for(let i=0;i<bufSize;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/bufSize,1.5);
+      const s=ac.createBufferSource();const g=ac.createGain();s.buffer=buf;
+      g.gain.setValueAtTime(0.3,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.5);
+      s.connect(g).connect(lp);s.start(now);
+      // Add descending tone layer
+      const o=ac.createOscillator();const g2=ac.createGain();o.type='square';
+      o.frequency.setValueAtTime(400,now);o.frequency.exponentialRampToValueAtTime(60,now+0.5);
+      g2.gain.setValueAtTime(0.15,now);g2.gain.exponentialRampToValueAtTime(0.001,now+0.5);
+      o.connect(g2).connect(lp);o.start(now);o.stop(now+0.5);
     }else if(type==='hit'){
-      // Original: short descending square wave for segment hit
+      // TMS9919: short square wave blip with pitch drop
       const o=ac.createOscillator();const g=ac.createGain();o.type='square';
-      o.frequency.setValueAtTime(500,now);o.frequency.exponentialRampToValueAtTime(100,now+0.1);
-      g.gain.setValueAtTime(0.12,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.1);
-      o.connect(g).connect(ac.destination);o.start(now);o.stop(now+0.1);
+      o.frequency.setValueAtTime(600,now);o.frequency.exponentialRampToValueAtTime(150,now+0.08);
+      g.gain.setValueAtTime(0.12,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.08);
+      o.connect(g).connect(lp);o.start(now);o.stop(now+0.08);
     }else if(type==='waveclear'){
-      // Original: ascending major chord arpeggio
+      // TMS9919: ascending arpeggio (major chord, 3 voices)
       [523,659,784,1047].forEach((f,i)=>{
         const o=ac.createOscillator();const g=ac.createGain();o.type='square';o.frequency.value=f;
-        g.gain.setValueAtTime(0.08,now+i*0.12);g.gain.exponentialRampToValueAtTime(0.001,now+i*0.12+0.2);
-        o.connect(g).connect(ac.destination);o.start(now+i*0.12);o.stop(now+i*0.12+0.22);
+        g.gain.setValueAtTime(0.1,now+i*0.15);g.gain.exponentialRampToValueAtTime(0.001,now+i*0.15+0.25);
+        o.connect(g).connect(lp);o.start(now+i*0.15);o.stop(now+i*0.15+0.27);
       });
     }else if(type==='gameover'){
-      // Original: descending chromatic scale
+      // TMS9919: descending chromatic scale with noise undertone
       [400,350,300,250,200].forEach((f,i)=>{
-        const o=ac.createOscillator();const g=ac.createGain();o.type='sawtooth';o.frequency.value=f;
-        g.gain.setValueAtTime(0.12,now+i*0.3);g.gain.exponentialRampToValueAtTime(0.001,now+i*0.3+0.25);
-        o.connect(g).connect(ac.destination);o.start(now+i*0.3);o.stop(now+i*0.3+0.27);
+        const o=ac.createOscillator();const g=ac.createGain();o.type='square';o.frequency.value=f;
+        g.gain.setValueAtTime(0.15,now+i*0.35);g.gain.exponentialRampToValueAtTime(0.001,now+i*0.35+0.3);
+        o.connect(g).connect(lp);o.start(now+i*0.35);o.stop(now+i*0.35+0.32);
       });
     }else if(type==='hurt'){
-      // Original: descending noise burst when player hit
-      const o=ac.createOscillator();const g=ac.createGain();o.type='sawtooth';
-      o.frequency.setValueAtTime(300,now);o.frequency.exponentialRampToValueAtTime(50,now+0.3);
-      g.gain.setValueAtTime(0.15,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.3);
-      o.connect(g).connect(ac.destination);o.start(now);o.stop(now+0.3);
+      // TMS9919: descending square wave + noise for player death
+      const o=ac.createOscillator();const g=ac.createGain();o.type='square';
+      o.frequency.setValueAtTime(400,now);o.frequency.exponentialRampToValueAtTime(50,now+0.4);
+      g.gain.setValueAtTime(0.2,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.4);
+      o.connect(g).connect(lp);o.start(now);o.stop(now+0.4);
+      const bufSize=ac.sampleRate*0.3;const buf=ac.createBuffer(1,bufSize,ac.sampleRate);
+      const d=buf.getChannelData(0);for(let i=0;i<bufSize;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/bufSize,2);
+      const s=ac.createBufferSource();const g2=ac.createGain();s.buffer=buf;
+      g2.gain.setValueAtTime(0.1,now);g2.gain.exponentialRampToValueAtTime(0.001,now+0.3);
+      s.connect(g2).connect(lp);s.start(now);
     }else if(type==='mushroom'){
-      // Original: short high blip for mushroom hit
-      const o=ac.createOscillator();const g=ac.createGain();o.type='triangle';
-      o.frequency.setValueAtTime(1000,now);o.frequency.exponentialRampToValueAtTime(300,now+0.03);
-      g.gain.setValueAtTime(0.06,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.03);
-      o.connect(g).connect(ac.destination);o.start(now);o.stop(now+0.03);
+      // TMS9919: short high square blip (mushroom damage)
+      const o=ac.createOscillator();const g=ac.createGain();o.type='square';
+      o.frequency.setValueAtTime(1200,now);o.frequency.exponentialRampToValueAtTime(400,now+0.04);
+      g.gain.setValueAtTime(0.08,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.04);
+      o.connect(g).connect(lp);o.start(now);o.stop(now+0.04);
     }else if(type==='bonus'){
-      // Original: quick ascending fanfare for last segment kill
+      // TMS9919: ascending fanfare (E-G-B-D), quick notes
       [784,988,1175,1568].forEach((f,i)=>{
         const o=ac.createOscillator();const g=ac.createGain();o.type='square';o.frequency.value=f;
-        g.gain.setValueAtTime(0.12,now+i*0.05);g.gain.exponentialRampToValueAtTime(0.001,now+i*0.05+0.07);
-        o.connect(g).connect(ac.destination);o.start(now+i*0.05);o.stop(now+i*0.05+0.09);
+        g.gain.setValueAtTime(0.15,now+i*0.06);g.gain.exponentialRampToValueAtTime(0.001,now+i*0.06+0.1);
+        o.connect(g).connect(lp);o.start(now+i*0.06);o.stop(now+i*0.06+0.12);
       });
     }
   }catch(e){}
@@ -453,57 +481,69 @@ function drawScorpion(s){
   const legPos = [0, -2, 0, 2][legFrame];
 
   // Body glow
-  ctx.shadowColor='#ff6600';ctx.shadowBlur=10;
-  ctx.strokeStyle='#ff6600';ctx.lineWidth=2;
+  ctx.shadowColor='#ff6600';ctx.shadowBlur=12;
+  ctx.strokeStyle='#ff6600';ctx.lineWidth=2.5;
 
   // Main body (oval)
-  ctx.beginPath();ctx.ellipse(sx,sy,6,5,0,0,Math.PI*2);ctx.stroke();
-  ctx.fillStyle='rgba(255,102,0,0.3)';
+  ctx.beginPath();ctx.ellipse(sx,sy,7,5,0,0,Math.PI*2);ctx.stroke();
+  const bodyGrad=ctx.createRadialGradient(sx,sy,1,sx,sy,7);
+  bodyGrad.addColorStop(0,'rgba(255,102,0,0.4)');
+  bodyGrad.addColorStop(1,'rgba(255,102,0,0.1)');
+  ctx.fillStyle=bodyGrad;
   ctx.fill();
 
-  // Tail (curved upward behind)
+  // Head (smaller oval in front)
+  ctx.lineWidth=2;
+  ctx.beginPath();ctx.ellipse(sx,sy-6,4,3.5,0,0,Math.PI*2);ctx.stroke();
+
+  // Tail (curved upward behind) - multi-segment
   const tailFrame=Math.floor(performance.now()/120)%4;
   const tailCurl=[-3,0,3,0][tailFrame];
   ctx.lineWidth=2;
   ctx.beginPath();
   ctx.moveTo(sx,sy+5);
-  ctx.quadraticCurveTo(sx+tailCurl,sy+12,sx+tailCurl*1.5,sy+10);
-  ctx.quadraticCurveTo(sx+tailCurl*2,sy+6,sx+tailCurl*1.5,sy+3);
+  ctx.quadraticCurveTo(sx+tailCurl*0.5,sy+10,sx+tailCurl,sy+13);
+  ctx.quadraticCurveTo(sx+tailCurl*1.5,sy+10,sx+tailCurl*2,sy+6);
+  ctx.quadraticCurveTo(sx+tailCurl*2.5,sy+3,sx+tailCurl*1.5,sy+1);
   ctx.stroke();
 
-  // Stinger tip
-  ctx.fillStyle='#ffaa00';ctx.shadowBlur=6;
-  ctx.beginPath();ctx.arc(sx+tailCurl*1.5,sy+3,2,0,Math.PI*2);ctx.fill();
+  // Stinger tip (bright)
+  ctx.fillStyle='#ffcc00';ctx.shadowBlur=10;
+  ctx.beginPath();ctx.arc(sx+tailCurl*1.5,sy+1,2.5,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#fff';ctx.shadowBlur=6;
+  ctx.beginPath();ctx.arc(sx+tailCurl*1.5,sy+1,1.2,0,Math.PI*2);ctx.fill();
 
   // Pincers (front) — more aggressive spread
   const pincerFrame=Math.floor(performance.now()/100)%4;
   const pincerOpen=[2,6,2,6][pincerFrame];
-  ctx.strokeStyle='#ff6600';ctx.lineWidth=1.5;ctx.shadowBlur=6;
+  ctx.strokeStyle='#ff8800';ctx.lineWidth=2;ctx.shadowBlur=8;
   ctx.beginPath();
-  ctx.moveTo(sx-3,sy-4);ctx.lineTo(sx-6-pincerOpen,sy-8);
-  ctx.moveTo(sx+3,sy-4);ctx.lineTo(sx+6+pincerOpen,sy-8);
+  ctx.moveTo(sx-3,sy-9);ctx.lineTo(sx-7-pincerOpen,sy-12);
+  ctx.lineTo(sx-9-pincerOpen,sy-10);
+  ctx.moveTo(sx+3,sy-9);ctx.lineTo(sx+7+pincerOpen,sy-12);
+  ctx.lineTo(sx+9+pincerOpen,sy-10);
   ctx.stroke();
 
   // Pincer tips
-  ctx.fillStyle='#ffaa00';
-  ctx.beginPath();ctx.arc(sx-6-pincerOpen,sy-8,1.5,0,Math.PI*2);ctx.fill();
-  ctx.beginPath();ctx.arc(sx+6+pincerOpen,sy-8,1.5,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#ffcc00';ctx.shadowBlur=6;
+  ctx.beginPath();ctx.arc(sx-9-pincerOpen,sy-10,1.5,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(sx+9+pincerOpen,sy-10,1.5,0,Math.PI*2);ctx.fill();
 
   // Animated legs (4 pairs, jumpy 4-frame)
-  ctx.strokeStyle='#ff6600';ctx.lineWidth=1;ctx.shadowBlur=4;
+  ctx.strokeStyle='#ff6600';ctx.lineWidth=1.5;ctx.shadowBlur=6;
   for(let i=0;i<4;i++){
     const ly=sy-3+i*2.5;
     const iLegPos = [0, -2, 0, 2][(legFrame+i)%4];
-    // Left legs
-    ctx.beginPath();ctx.moveTo(sx-5,ly);ctx.lineTo(sx-8-iLegPos,ly+3);ctx.stroke();
-    // Right legs
-    ctx.beginPath();ctx.moveTo(sx+5,ly);ctx.lineTo(sx+8+iLegPos,ly+3);ctx.stroke();
+    // Left legs (with knee joint)
+    ctx.beginPath();ctx.moveTo(sx-6,ly);ctx.lineTo(sx-9-iLegPos,ly+2);ctx.lineTo(sx-11-iLegPos*1.5,ly+4);ctx.stroke();
+    // Right legs (with knee joint)
+    ctx.beginPath();ctx.moveTo(sx+6,ly);ctx.lineTo(sx+9+iLegPos,ly+2);ctx.lineTo(sx+11+iLegPos*1.5,ly+4);ctx.stroke();
   }
 
   // Eyes
-  ctx.fillStyle='#fff';ctx.shadowBlur=3;
-  ctx.beginPath();ctx.arc(sx-2,sy-3,1.5,0,Math.PI*2);ctx.fill();
-  ctx.beginPath();ctx.arc(sx+2,sy-3,1.5,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#fff';ctx.shadowBlur=4;
+  ctx.beginPath();ctx.arc(sx-2,sy-6.5,1.2,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(sx+2,sy-6.5,1.2,0,Math.PI*2);ctx.fill();
 
   ctx.shadowBlur=0;
 }
@@ -568,30 +608,47 @@ function drawSaucer(s){
   const sx=s.x, sy=s.y;
   const t=s.animPhase;
 
-  // Glow (original saucer was yellow/gold, not purple)
-  ctx.shadowColor='#ffcc00';ctx.shadowBlur=12;
+  // Enhanced saucer: golden dome with detailed lights
+  ctx.shadowColor='#ffcc00';ctx.shadowBlur=14;
 
-  // Saucer body (vector-style dome)
-  ctx.strokeStyle='#ffcc00';ctx.lineWidth=2;
+  // Outer dome (larger, more detailed)
+  ctx.strokeStyle='#ffcc00';ctx.lineWidth=2.5;
   ctx.beginPath();
-  ctx.ellipse(sx,sy,15,6,0,Math.PI,0); // top dome
+  ctx.ellipse(sx,sy-2,18,8,0,Math.PI,0); // top dome
   ctx.stroke();
-  ctx.fillStyle='rgba(255,204,0,0.2)';
-  ctx.fill();
 
-  // Base ring
-  ctx.lineWidth=1.5;
-  ctx.beginPath();ctx.ellipse(sx,sy,15,3,0,0,Math.PI*2);ctx.stroke();
+  // Dome fill with gradient
+  const domeGrad=ctx.createRadialGradient(sx,sy-6,2,sx,sy-2,18);
+  domeGrad.addColorStop(0,'rgba(255,230,100,0.4)');
+  domeGrad.addColorStop(1,'rgba(255,204,0,0.1)');
+  ctx.fillStyle=domeGrad;
+  ctx.beginPath();ctx.ellipse(sx,sy-2,18,8,0,Math.PI,0);ctx.fill();
 
-  // Center light
+  // Base ring (wider)
+  ctx.lineWidth=2;
+  ctx.beginPath();ctx.ellipse(sx,sy+2,18,4,0,0,Math.PI*2);ctx.stroke();
+
+  // Saucer underside (subtle)
+  ctx.strokeStyle='rgba(255,204,0,0.4)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.ellipse(sx,sy+4,12,3,0,0,Math.PI);ctx.stroke();
+
+  // Center light (pulsing)
   const lightPulse=Math.sin(t*3)*0.5+0.5;
-  ctx.fillStyle=`rgba(255,255,255,${0.5+lightPulse*0.5})`;ctx.shadowBlur=6;
-  ctx.beginPath();ctx.arc(sx,sy-2,2,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle=`rgba(255,255,255,${0.5+lightPulse*0.5})`;ctx.shadowBlur=10;
+  ctx.beginPath();ctx.arc(sx,sy-4,2.5,0,Math.PI*2);ctx.fill();
 
-  // Edge lights
-  ctx.fillStyle=`rgba(255,204,0,${0.3+lightPulse*0.4})`;
-  ctx.beginPath();ctx.arc(sx-12,sy,1.5,0,Math.PI*2);ctx.fill();
-  ctx.beginPath();ctx.arc(sx+12,sy,1.5,0,Math.PI*2);ctx.fill();
+  // Edge lights (3 per side)
+  ctx.shadowBlur=6;
+  for(let i=-1;i<=1;i++){
+    const ex=sx+i*8, ey=sy-1;
+    ctx.fillStyle=`rgba(255,204,0,${0.4+lightPulse*0.4})`;
+    ctx.beginPath();ctx.arc(ex,ey,1.8,0,Math.PI*2);ctx.fill();
+  }
+
+  // Landing lights (bottom)
+  ctx.fillStyle=`rgba(255,100,0,${0.3+lightPulse*0.3})`;
+  ctx.beginPath();ctx.arc(sx-5,sy+6,1.5,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(sx+5,sy+6,1.5,0,Math.PI*2);ctx.fill();
 
   ctx.shadowBlur=0;
 }
@@ -735,25 +792,37 @@ function drawCenti(c){
     const sx=seg.x, sy=seg.y;
 
     if(i===0){
-      // === HEAD: Same rectangular shape as body, different color ===
-      // In original Centipede, head uses identical sprite shape as body but with
-      // a distinct color. The "head" is visually the same rectangular segment shape.
+      // === HEAD: Rectangular with antennae (authentic Atari bitmap style) ===
       const dir=c.dirX;
       const sc=getSC();
+      const antWave=Math.sin(t*6)*3; // antenna wave
 
-      ctx.shadowColor=sc.centiHead;ctx.shadowBlur=8;
-      ctx.strokeStyle=sc.centiHead;ctx.lineWidth=2;
+      ctx.shadowColor=sc.centiHead;ctx.shadowBlur=10;
+      ctx.strokeStyle=sc.centiHead;ctx.lineWidth=2.5;
 
-      // Head is slightly larger than body (original: bigger head sprite)
+      // Head body - rectangular, wider than body segments
       ctx.beginPath();
       ctx.rect(sx-seg.w/2-4, sy-seg.h/2-2, seg.w+8, seg.h+4);
       ctx.stroke();
 
-      // Inner fill (more opaque than body to distinguish head)
+      // Inner fill (opaque to distinguish head)
       ctx.shadowBlur=4;
       const headRgba=sc.centiHead.replace('#','');
       ctx.fillStyle=`rgba(${parseInt(headRgba.slice(0,2),16)},${parseInt(headRgba.slice(2,4),16)},${parseInt(headRgba.slice(4,6),16)},0.7)`;
       ctx.fillRect(sx-seg.w/3, sy-seg.h/4, seg.w*0.66, seg.h*0.5);
+
+      // Antennae (2 thin lines waving from front of head)
+      ctx.strokeStyle=sc.centiHead;ctx.lineWidth=1.5;ctx.shadowBlur=6;
+      const frontX=sx+dir*6; // front edge of head
+      ctx.beginPath();ctx.moveTo(frontX,sy-seg.h/2);
+      ctx.lineTo(frontX+dir*5, sy-seg.h/2-6+antWave);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(frontX,sy-seg.h/2+2);
+      ctx.lineTo(frontX+dir*4, sy-seg.h/2-4-antWave);ctx.stroke();
+
+      // Antenna tips (bright dots)
+      ctx.fillStyle=sc.centiHead;ctx.shadowBlur=8;
+      ctx.beginPath();ctx.arc(frontX+dir*5, sy-seg.h/2-6+antWave,1.5,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(frontX+dir*4, sy-seg.h/2-4-antWave,1.5,0,Math.PI*2);ctx.fill();
 
       ctx.shadowBlur=0;
     }else if(i===c.segs.length-1){
@@ -822,31 +891,44 @@ function drawMush(m){
   const sx=m.x, sy=m.y;
   const sc=getSC();
 
-  // Original: bitmap mushroom sprites with distinct cap/stem
-  ctx.shadowColor=sc.mush;ctx.shadowBlur=8;
+  // Authentic Atari mushroom: bitmap-style cap + stem + spots
+  const mushRgba=sc.mush.replace('#','');
+  const mr=parseInt(mushRgba.slice(0,2),16);
+  const mg=parseInt(mushRgba.slice(2,4),16);
+  const mb=parseInt(mushRgba.slice(4,6),16);
 
-  // Stem (single line, original bitmap style)
-  ctx.strokeStyle=sc.mush;ctx.lineWidth=2;
-  ctx.beginPath();ctx.moveTo(sx,sy+1);ctx.lineTo(sx,sy+m.h/2);ctx.stroke();
+  ctx.shadowColor=sc.mush;ctx.shadowBlur=6;
 
-  // Cap (wider arc, more prominent)
-  ctx.lineWidth=2;ctx.shadowBlur=10;
+  // Stem (thick, slightly tapered)
+  ctx.strokeStyle=sc.mush;ctx.lineWidth=2.5;
+  ctx.beginPath();ctx.moveTo(sx,sy+3);ctx.lineTo(sx,sy+m.h/2);ctx.stroke();
+
+  // Cap - half-ellipse with thicker stroke (authentic bitmap look)
+  ctx.lineWidth=2.5;ctx.shadowBlur=10;
   ctx.beginPath();ctx.arc(sx,sy,m.w/2,Math.PI,0);ctx.stroke();
 
-  // Cap fill
-  const mushRgba=sc.mush.replace('#','');
-  ctx.fillStyle=`rgba(${parseInt(mushRgba.slice(0,2),16)},${parseInt(mushRgba.slice(2,4),16)},${parseInt(mushRgba.slice(4,6),16)},0.25)`;
+  // Cap fill with gradient for depth
+  const capGrad=ctx.createRadialGradient(sx,sy-m.w*0.2,1,sx,sy,m.w/2);
+  capGrad.addColorStop(0,`rgba(${mr},${mg},${mb},0.45)`);
+  capGrad.addColorStop(1,`rgba(${mr},${mg},${mb},0.15)`);
+  ctx.fillStyle=capGrad;
   ctx.beginPath();ctx.arc(sx,sy,m.w/2,Math.PI,0);ctx.fill();
 
   // Spots (white dots on cap) - original had 1-3 spots
-  ctx.shadowBlur=3;ctx.fillStyle='rgba(255,255,255,0.8)';
+  ctx.shadowBlur=3;ctx.fillStyle=`rgba(${Math.min(255,mr+80)},${Math.min(255,mg+80)},${Math.min(255,mb+80)},0.9)`;
   if(m.spots){
     for(let i=0;i<m.spots.length;i++){
       const sp=m.spots[i];
       ctx.beginPath();
-      ctx.arc(sx+Math.cos(sp.angle)*sp.dist,sy+Math.sin(sp.angle)*sp.dist*0.5-3,2,0,Math.PI*2);
+      ctx.arc(sx+Math.cos(sp.angle)*sp.dist,sy+Math.sin(sp.angle)*sp.dist*0.5-3,2.2,0,Math.PI*2);
       ctx.fill();
     }
+  }
+
+  // Damage indicator: red tint when damaged (hp < 4)
+  if(m.hp<4){
+    ctx.fillStyle=`rgba(255,0,0,${0.3*(4-m.hp)})`;
+    ctx.beginPath();ctx.arc(sx,sy,m.w/2,Math.PI,0);ctx.fill();
   }
 
   ctx.shadowBlur=0;
@@ -858,33 +940,37 @@ function drawShip(s){
   // Blink when invincible
   if(invincibleTimer>0&&Math.floor(invincibleTimer/4)%2===0)return;
 
-  // Player: "somewhat humanoid head" - Atari authentic
-  // Original Centipede player is a small face/head shape with a gun barrel
+  // Authentic Atari Centipede player: humanoid gunner with gun barrel
+  // Body: small rectangle (torso)
   ctx.shadowColor='#2288ff';ctx.shadowBlur=10;
-  ctx.strokeStyle='#2288ff';ctx.lineWidth=2;
+  ctx.strokeStyle='#2288ff';ctx.lineWidth=2.5;
 
-  // Head outline (oval)
-  ctx.beginPath();ctx.ellipse(sx,sy,6,7,0,0,Math.PI*2);ctx.stroke();
+  // Torso (rectangle)
+  ctx.beginPath();ctx.rect(sx-4,sy-2,8,10);ctx.stroke();
   ctx.fillStyle='rgba(34,136,255,0.3)';
-  ctx.fill();
+  ctx.fillRect(sx-4,sy-2,8,10);
 
-  // Eyes (two dots)
+  // Head (circle on top)
+  ctx.beginPath();ctx.arc(sx,sy-5,4,0,Math.PI*2);ctx.stroke();
+  ctx.fillStyle='rgba(34,136,255,0.4)';ctx.fill();
+
+  // Eyes
   ctx.fillStyle='#fff';ctx.shadowBlur=4;
-  ctx.beginPath();ctx.arc(sx-2,sy-2,1.5,0,Math.PI*2);ctx.fill();
-  ctx.beginPath();ctx.arc(sx+2,sy-2,1.5,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(sx-1.5,sy-5.5,1.2,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(sx+1.5,sy-5.5,1.2,0,Math.PI*2);ctx.fill();
 
-  // Mouth (small line)
-  ctx.strokeStyle='#66bbff';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(sx-2,sy+3);ctx.lineTo(sx+2,sy+3);ctx.stroke();
+  // Gun barrel (pointing up from center)
+  ctx.shadowColor='#44aaff';ctx.shadowBlur=8;
+  ctx.strokeStyle='#44aaff';ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(sx,sy-9);ctx.lineTo(sx,sy-18);ctx.stroke();
 
-  // Gun barrel pointing up
-  ctx.shadowColor='#44aaff';ctx.shadowBlur=6;
-  ctx.strokeStyle='#44aaff';ctx.lineWidth=2;
-  ctx.beginPath();ctx.moveTo(sx,sy-7);ctx.lineTo(sx,sy-14);ctx.stroke();
+  // Gun tip (bright glow)
+  ctx.fillStyle='#88ccff';ctx.shadowBlur=12;
+  ctx.beginPath();ctx.arc(sx,sy-18,2.5,0,Math.PI*2);ctx.fill();
 
-  // Gun tip glow
-  ctx.fillStyle='#88ccff';
-  ctx.beginPath();ctx.arc(sx,sy-14,2,0,Math.PI*2);ctx.fill();
+  // Gun tip inner (white hot)
+  ctx.fillStyle='#fff';ctx.shadowBlur=6;
+  ctx.beginPath();ctx.arc(sx,sy-18,1.2,0,Math.PI*2);ctx.fill();
 
   ctx.shadowBlur=0;
 }
@@ -916,25 +1002,77 @@ function drawBackground(){
   ctx.fillStyle='#000';ctx.fillRect(0,0,FIELD_W,FIELD_H);
 }
 
-// === Bullet drawing (field-relative) ===
+// === CRT overlay (scanlines + vignette + screen shake + phosphor bloom) ===
+function drawCRTOverlay(){
+  // Screen shake update
+  if(screenShakeDecay>0){
+    screenShakeX=(Math.random()-0.5)*screenShakeDecay;
+    screenShakeY=(Math.random()-0.5)*screenShakeDecay;
+    screenShakeDecay*=0.85;
+    if(screenShakeDecay<0.3)screenShakeDecay=0;
+  }else{screenShakeX=0;screenShakeY=0;}
+
+  // Impact flash
+  if(impactFlash>0){
+    ctx.fillStyle=`rgba(255,255,255,${impactFlash/15})`;
+    ctx.fillRect(0,0,FIELD_W,FIELD_H);
+    impactFlash--;
+  }
+
+  // Scanlines (screen-space)
+  ctx.restore(); // exit game transform
+  if(scanlinePattern){
+    ctx.fillStyle=scanlinePattern;
+    ctx.fillRect(0,0,W,H);
+  }
+
+  // Vignette (darker corners)
+  const vg=ctx.createRadialGradient(W/2,H/2,W*0.3,W/2,H/2,W*0.75);
+  vg.addColorStop(0,'rgba(0,0,0,0)');
+  vg.addColorStop(1,'rgba(0,0,0,0.45)');
+  ctx.fillStyle=vg;
+  ctx.fillRect(0,0,W,H);
+
+  // Phosphor bloom: subtle colored glow on bright edges
+  ctx.globalCompositeOperation='screen';
+  ctx.fillStyle='rgba(0,255,68,0.015)';
+  ctx.fillRect(0,0,W,H);
+  ctx.globalCompositeOperation='source-over';
+
+  // Re-apply transform for HUD (which draws in screen coords)
+  return true; // signals that we already restored
+}
+
+// === Bullet drawing (field-relative) - enhanced with trail + glow ===
 function drawBullet(b){
   const sx=b.x, sy=b.y;
 
-  // Original: bright white/yellow dart with glow trail
-  ctx.shadowColor='#ffffff';ctx.shadowBlur=12;
-  ctx.strokeStyle='#ffffff';ctx.lineWidth=3;
+  // Main dart: bright white with intense glow
+  ctx.shadowColor='#ffffff';ctx.shadowBlur=15;
+  ctx.strokeStyle='#ffffff';ctx.lineWidth=3.5;
 
-  // Main dart (bright white line)
-  ctx.beginPath();ctx.moveTo(sx,sy-12);ctx.lineTo(sx,sy+6);ctx.stroke();
+  // Bullet body (bright line)
+  ctx.beginPath();ctx.moveTo(sx,sy-14);ctx.lineTo(sx,sy+6);ctx.stroke();
 
-  // Glow trail (subtle)
-  ctx.shadowBlur=8;
-  ctx.strokeStyle='rgba(255,200,50,0.6)';ctx.lineWidth=5;
-  ctx.beginPath();ctx.moveTo(sx,sy-8);ctx.lineTo(sx,sy+4);ctx.stroke();
+  // Orange trail (fading behind bullet)
+  ctx.shadowBlur=10;
+  ctx.strokeStyle='rgba(255,200,50,0.7)';ctx.lineWidth=6;
+  ctx.beginPath();ctx.moveTo(sx,sy-8);ctx.lineTo(sx,sy+6);ctx.stroke();
 
-  // Bright tip
-  ctx.fillStyle='#ffffff';ctx.shadowBlur=10;
-  ctx.beginPath();ctx.arc(sx,sy-12,2.5,0,Math.PI*2);ctx.fill();
+  // Faint outer trail
+  ctx.shadowBlur=6;
+  ctx.strokeStyle='rgba(255,150,20,0.3)';ctx.lineWidth=8;
+  ctx.beginPath();ctx.moveTo(sx,sy-4);ctx.lineTo(sx,sy+4);ctx.stroke();
+
+  // Bright tip (white-hot point)
+  ctx.fillStyle='#ffffff';ctx.shadowColor='#fff';ctx.shadowBlur=14;
+  ctx.beginPath();ctx.arc(sx,sy-14,3,0,Math.PI*2);ctx.fill();
+
+  // Inner core (even brighter)
+  ctx.fillStyle='#fff';ctx.shadowBlur=8;
+  ctx.beginPath();ctx.arc(sx,sy-14,1.5,0,Math.PI*2);ctx.fill();
+
+  ctx.shadowBlur=0;
 }
 
 // === Field border with glow effect ===
@@ -955,32 +1093,35 @@ function drawFieldBorder(){
   ctx.shadowBlur=0;
 }
 
-// === HUD with arcade styling ===
+// === HUD with arcade styling (authentic Atari cabinet layout) ===
 function drawHUD(){
-  ctx.fillStyle='#fff';ctx.font='bold 14px monospace';ctx.shadowColor='#fff';ctx.shadowBlur=4;
-  ctx.fillText('SCORE '+score,10,OY-8);
-  ctx.shadowBlur=0;
+  // Score (top left, bright white with glow)
+  ctx.fillStyle='#fff';ctx.font='bold 16px monospace';ctx.shadowColor='#fff';ctx.shadowBlur=6;
+  ctx.fillText('SCORE '+score,10,OY-6);ctx.shadowBlur=0;
 
-  // Lives as small player heads (matching in-game sprite)
+  // Lives as small player icons (matching in-game sprite)
   for(let i=0;i<lives;i++){
-    const lx=18+i*20, ly=OY+4;
-    ctx.shadowColor='#2288ff';ctx.shadowBlur=3;
-    ctx.strokeStyle='#2288ff';ctx.lineWidth=1;
-    // Small rectangle matching player head shape
-    ctx.beginPath();ctx.rect(lx-4,ly-5,8,10);ctx.stroke();
+    const lx=18+i*24, ly=OY+6;
+    ctx.shadowColor='#2288ff';ctx.shadowBlur=4;
+    ctx.strokeStyle='#2288ff';ctx.lineWidth=1.5;
+    // Torso
+    ctx.beginPath();ctx.rect(lx-3,ly-2,6,7);ctx.stroke();
     ctx.fillStyle='rgba(34,136,255,0.3)';ctx.fill();
+    // Head
+    ctx.beginPath();ctx.arc(lx,ly-4,3,0,Math.PI*2);ctx.stroke();
     ctx.shadowBlur=0;
   }
 
-  ctx.fillStyle='#4f4';ctx.font='bold 14px monospace';ctx.shadowColor='#4f4';ctx.shadowBlur=5;
-  ctx.fillText('WAVE '+wave,W-75,OY-8);ctx.shadowBlur=0;
+  // Wave (top right)
+  ctx.fillStyle='#4f4';ctx.font='bold 16px monospace';ctx.shadowColor='#4f4';ctx.shadowBlur=6;
+  ctx.fillText('WAVE '+wave,W-90,OY-6);ctx.shadowBlur=0;
 
-  // Display actual high score
-  ctx.fillStyle='#ff0';ctx.font='bold 12px monospace';ctx.shadowColor='#ff0';ctx.shadowBlur=5;
-  ctx.fillText('HI '+highScore,W-90,OY+8);ctx.shadowBlur=0;
+  // High score (below wave)
+  ctx.fillStyle='#ff0';ctx.font='bold 12px monospace';ctx.shadowColor='#ff0';ctx.shadowBlur=4;
+  ctx.fillText('HI '+highScore,W-95,OY+10);ctx.shadowBlur=0;
 }
 
-// === Attract/start screen ===
+// === Attract/start screen (authentic Atari cabinet style) ===
 function drawAttract(){
   ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
 
@@ -999,15 +1140,43 @@ function drawAttract(){
   const attractOX=(W-FIELD_W*attractScale)/2;
   const fieldTop=titleH;
 
-  // Title (screen coords) - big, bold, classic Atari feel
-  ctx.shadowColor='#ff2200';ctx.shadowBlur=25*pulse;
-  ctx.strokeStyle='#ff2200';ctx.lineWidth=3;
-  ctx.font='bold 42px monospace';
+  // === TITLE: Iconic Atari CENTIPEDE logo style ===
+  // Large, stylized title with multi-layer glow
+  ctx.textAlign='center';
+
+  // Outer glow layer (red, wide)
+  ctx.shadowColor='#ff2200';ctx.shadowBlur=40*pulse;
+  ctx.strokeStyle='#ff2200';ctx.lineWidth=4;
+  ctx.font='bold 52px monospace';
   const title='CENTIPEDE',tw=ctx.measureText(title).width;
-  ctx.strokeText(title,W/2-tw/2,titleH-8);
-  ctx.shadowBlur=12*pulse;
-  ctx.fillStyle='rgba(255,34,0,0.4)';
-  ctx.fillText(title,W/2-tw/2,titleH-8);
+  ctx.strokeText(title,W/2,titleH-6);
+
+  // Inner glow layer (bright red, tighter)
+  ctx.shadowBlur=15*pulse;ctx.lineWidth=2.5;
+  ctx.strokeText(title,W/2,titleH-6);
+
+  // Fill with gradient
+  const titleGrad=ctx.createLinearGradient(W/2-tw/2,titleH-30,W/2+tw/2,titleH-6);
+  titleGrad.addColorStop(0,'rgba(255,80,40,0.6)');
+  titleGrad.addColorStop(0.5,'rgba(255,34,0,0.8)');
+  titleGrad.addColorStop(1,'rgba(255,80,40,0.6)');
+  ctx.fillStyle=titleGrad;
+  ctx.fillText(title,W/2,titleH-6);
+
+  // White-hot center line
+  ctx.shadowColor='#fff';ctx.shadowBlur=8*pulse;
+  ctx.strokeStyle='rgba(255,255,255,0.3)';ctx.lineWidth=1;
+  ctx.strokeText(title,W/2,titleH-7);
+
+  ctx.shadowBlur=0;ctx.textAlign='start';
+
+  // Apply CRT overlay to attract screen too
+  if(scanlinePattern){
+    ctx.fillStyle=scanlinePattern;ctx.fillRect(0,0,W,H);
+  }
+  const vg=ctx.createRadialGradient(W/2,H/2,W*0.3,W/2,H/2,W*0.75);
+  vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,0.45)');
+  ctx.fillStyle=vg;ctx.fillRect(0,0,W,H);
 
   // Field with crawling demo centipede
   ctx.save();ctx.translate(attractOX,fieldTop);ctx.scale(attractScale,attractScale);
@@ -1116,41 +1285,55 @@ function drawWaveClear(){
   }
 }
 
-// === Game over screen with arcade styling ===
+// === Game over screen with arcade styling (enhanced) ===
 function drawGameOver(){
-  // Original: semi-transparent overlay with bold text
-  ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fillRect(0,0,W,H);
+  // Semi-transparent dark overlay
+  ctx.fillStyle='rgba(0,0,0,0.75)';ctx.fillRect(0,0,W,H);
 
-  ctx.shadowColor='#ff2200';ctx.shadowBlur=20;
-  ctx.strokeStyle='#ff2200';ctx.lineWidth=3;ctx.font='bold 42px monospace';
+  // "GAME OVER" with multi-layer glow
+  ctx.shadowColor='#ff2200';ctx.shadowBlur=30;
+  ctx.strokeStyle='#ff2200';ctx.lineWidth=4;ctx.font='bold 48px monospace';
+  ctx.textAlign='center';
   const goText='GAME OVER',goW=ctx.measureText(goText).width;
-  ctx.strokeText(goText,W/2-goW/2,H/2-50);
-  ctx.shadowBlur=8;
-  ctx.fillStyle='rgba(255,34,0,0.4)';
-  ctx.fillText(goText,W/2-goW/2,H/2-50);
+  ctx.strokeText(goText,W/2,H/2-50);
 
+  ctx.shadowBlur=12;ctx.lineWidth=2;
+  ctx.strokeText(goText,W/2,H/2-50);
+
+  ctx.fillStyle='rgba(255,34,0,0.5)';
+  ctx.fillText(goText,W/2,H/2-50);
+
+  // Score
   ctx.shadowColor='#ff0';ctx.shadowBlur=8;
-  ctx.fillStyle='#ff0';ctx.font='bold 20px monospace';
+  ctx.fillStyle='#ff0';ctx.font='bold 24px monospace';
   const scText='SCORE: '+score,scW=ctx.measureText(scText).width;
-  ctx.fillText(scText,W/2-scW/2,H/2);
+  ctx.fillText(scText,W/2,H/2);
 
+  // Wave reached
   ctx.shadowColor='#4f4';ctx.shadowBlur=6;
-  ctx.fillStyle='#4f4';ctx.font='bold 18px monospace';
+  ctx.fillStyle='#4f4';ctx.font='bold 20px monospace';
   const wvText='WAVE: '+wave,wvW=ctx.measureText(wvText).width;
-  ctx.fillText(wvText,W/2-wvW/2,H/2+35);
+  ctx.fillText(wvText,W/2,H/2+40);
 
-  // BUG FIX #17: Show high score on game over only if strictly greater
+  // High score notification
   if(score>=highScore&&score>0){
-    ctx.fillStyle='#ff0';ctx.font='bold 20px monospace';ctx.shadowColor='#ff0';ctx.shadowBlur=10;
-    const nh='NEW HIGH SCORE!',nhw=ctx.measureText(nh).width;
-    ctx.fillText(nh,W/2-nhw/2,H/2+65);
+    const blink=Math.sin(performance.now()/200)>0;
+    if(blink){
+      ctx.fillStyle='#f00';ctx.font='bold 22px monospace';ctx.shadowColor='#f00';ctx.shadowBlur=12;
+      const nh='NEW HIGH SCORE!',nhw=ctx.measureText(nh).width;
+      ctx.fillText(nh,W/2,H/2+75);
+    }
   }
 
-  const blink=Math.sin(performance.now()/200)>0; // faster blink
-  if(blink){ctx.shadowBlur=0;ctx.fillStyle='#ccc';ctx.font='bold 16px monospace';
+  // Restart prompt (blinking)
+  const blink2=Math.sin(performance.now()/250)>0;
+  if(blink2){
+    ctx.shadowBlur=0;ctx.fillStyle='#ccc';ctx.font='bold 16px monospace';
     const rt='PRESS SPACE OR TAP TO START',rtW=ctx.measureText(rt).width;
-    ctx.fillText(rt,W/2-rtW/2,H/2+95);}
-  ctx.shadowBlur=0;
+    ctx.fillText(rt,W/2,H/2+110);
+  }
+
+  ctx.shadowBlur=0;ctx.textAlign='start';
 }
 
 // === Collision detection (all field-relative) ===
@@ -1187,11 +1370,11 @@ function checkCollisions(){
           bullets.splice(bi,1);bulletHit=true;
 
           if(c.segs.length===1){
-            score+=200;addParticles(seg.x,seg.y,'#ff4422',25,8);
+            score+=200;addParticles(seg.x,seg.y,'#ff4422',25,8);triggerShake(6);triggerFlash(5);
             addFloatText(seg.x,seg.y,['BONUS!','+200'],'#ff0');
             centipedes.splice(ci,1);playSound('explode');playSound('bonus');
           }else if(sk===0){
-            score+=100;addParticles(seg.x,seg.y,'#ff4422',20,6);
+            score+=100;addParticles(seg.x,seg.y,'#ff4422',20,6);triggerShake(4);
             addFloatText(seg.x,seg.y,['HEAD!','+100'],'#f84');
             // Spawn scorpion from destroyed head (wave 2+)
             if(wave>=2)spawnScorpion(seg.x,seg.y);
@@ -1297,7 +1480,7 @@ function checkCollisions(){
       }
     }
     if(hit){
-      lives--;addParticles(ship.x,ship.y,'#2a6aaa',12);playSound('hurt');
+      lives--;addParticles(ship.x,ship.y,'#2a6aaa',12);playSound('hurt');triggerShake(8);triggerFlash(10);
       // Screen flash on hit (brief white overlay)
       ctx.fillStyle='rgba(255,255,255,0.3)';ctx.fillRect(0,0,W,H);
       invincibleTimer=240;
@@ -1367,8 +1550,10 @@ function loop(){
     for(let i=0;i<scorpions.length;i++)drawScorpion(scorpions[i]);
     for(let i=0;i<saucers.length;i++)drawSaucer(saucers[i]);
     for(let i=0;i<spiders.length;i++)drawSpider(spiders[i]);
-    drawFieldBorder();drawGameOver();
-    ctx.restore();
+    drawFieldBorder();
+    drawCRTOverlay(); // Apply CRT to game over too
+    drawHUD();
+    drawGameOver();
     // Save high score on game over
     if(score>highScore){highScore=score;localStorage.setItem('centipede_highscore',highScore);}
     if(gameState!=='gameover')playSound('gameover');
@@ -1431,9 +1616,10 @@ function loop(){
   // Wave management
   checkWaveClear();updateWaveTransition();
 
-  // Draw everything (layered) - canvas transform handles scaling/positioning
+  // Draw everything (layered) - canvas transform handles scaling/positioning + screen shake
   ctx.save();
-  ctx.translate(OX,OY);ctx.scale(SCALE,SCALE);
+  ctx.translate(OX+screenShakeX*SCALE,OY+screenShakeY*SCALE);
+  ctx.scale(SCALE,SCALE);
   drawBackground();
   for(let i=0;i<mushrooms.length;i++)drawMush(mushrooms[i]);
   for(let i=0;i<centipedes.length;i++)drawCenti(centipedes[i]);
@@ -1454,7 +1640,8 @@ function loop(){
   if(ship)drawShip(ship);
   drawFieldBorder();
   drawParticles();drawFloatText();
-  ctx.restore();
+  // Apply CRT overlay (scanlines, vignette, bloom) - this restores ctx
+  drawCRTOverlay();
   drawHUD();drawWaveClear();
 
   requestAnimationFrame(loop);
