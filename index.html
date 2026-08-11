@@ -834,19 +834,18 @@ function drawMush(m){
   // Original: bitmap mushroom sprites with distinct cap/stem
   ctx.shadowColor=sc.mush;ctx.shadowBlur=8;
 
-  // Stem (thicker, more solid)
-  ctx.strokeStyle=sc.mush;ctx.lineWidth=3;
-  ctx.beginPath();ctx.moveTo(sx-2,sy+1);ctx.lineTo(sx-2,sy+m.h/2);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(sx+2,sy+1);ctx.lineTo(sx+2,sy+m.h/2);ctx.stroke();
+  // Stem (single line, original bitmap style)
+  ctx.strokeStyle=sc.mush;ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(sx,sy+1);ctx.lineTo(sx,sy+m.h/2);ctx.stroke();
 
   // Cap (wider arc, more prominent)
-  ctx.strokeStyle=sc.mush;ctx.lineWidth=2;ctx.shadowBlur=10;
-  ctx.beginPath();ctx.arc(sx,sy,m.w/2+1,Math.PI,0);ctx.stroke();
+  ctx.lineWidth=2;ctx.shadowBlur=10;
+  ctx.beginPath();ctx.arc(sx,sy,m.w/2,Math.PI,0);ctx.stroke();
 
   // Cap fill
   const mushRgba=sc.mush.replace('#','');
   ctx.fillStyle=`rgba(${parseInt(mushRgba.slice(0,2),16)},${parseInt(mushRgba.slice(2,4),16)},${parseInt(mushRgba.slice(4,6),16)},0.25)`;
-  ctx.beginPath();ctx.arc(sx,sy,m.w/2+1,Math.PI,0);ctx.fill();
+  ctx.beginPath();ctx.arc(sx,sy,m.w/2,Math.PI,0);ctx.fill();
 
   // Spots (white dots on cap)
   ctx.shadowBlur=4;ctx.fillStyle='#fff';
