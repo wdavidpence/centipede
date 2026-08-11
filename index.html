@@ -513,6 +513,10 @@ function drawScorpion(s){
   const legFrame=Math.floor(performance.now()/80)%4; // 4 discrete frames
   const legPos = [0, -2, 0, 2][legFrame];
 
+  // Movement glow trail (faint afterimage behind scorpion)
+  ctx.fillStyle='rgba(255,102,0,0.08)';ctx.shadowBlur=0;
+  ctx.beginPath();ctx.arc(sx-s.dirX*8,sy,8,0,Math.PI*2);ctx.fill();
+
   // Body glow
   ctx.shadowColor='#ff6600';ctx.shadowBlur=12;
   ctx.strokeStyle='#ff6600';ctx.lineWidth=2.5;
@@ -735,6 +739,8 @@ function updateSpider(s){
     if(s.y>30){
       s.state='jumping';
       s.jumpTimer=0;
+      // Landing dust particles
+      addParticles(s.x,s.y,['#ff00aa','#4a0040'],6,2);
     }
     return;
   }
@@ -1349,8 +1355,15 @@ function drawCRTOverlay(){
   ctx.fillStyle=vg;
   ctx.fillRect(0,0,W,H);
 
-  // CRT power-off effect (screen collapses to horizontal line)
+  // CRT power-off effect (screen collapses to horizontal line with static)
   if(crtPowerOffProgress>0&&crtPowerOffProgress<1){
+    // Static noise during power-off (random white dots)
+    const staticAlpha=crtPowerOffProgress*0.15;
+    for(let n=0;n<200;n++){
+      const nx=Math.random()*W, ny=Math.random()*H;
+      ctx.fillStyle=`rgba(255,255,255,${staticAlpha*Math.random()})`;
+      ctx.fillRect(nx,ny,1,1);
+    }
     const squeeze=1-crtPowerOffProgress*0.95; // vertical squeeze 1->0.05
     const brightness=1-crtPowerOffProgress*0.7; // dimming
     ctx.save();
@@ -1405,7 +1418,13 @@ function drawBullet(b){
   ctx.shadowColor='#ffffff';ctx.shadowBlur=15;
   ctx.strokeStyle='#ffffff';ctx.lineWidth=3.5;
 
+  // Ionization glow (blue-white aura around dart)
+  ctx.shadowColor='#88ccff';ctx.shadowBlur=10;
+  ctx.strokeStyle='rgba(136,204,255,0.3)';ctx.lineWidth=7;
+  ctx.beginPath();ctx.moveTo(sx+wobble*0.5,sy-12);ctx.lineTo(sx,sy+4);ctx.stroke();
+
   // Bullet body (bright line) with wobble
+  ctx.shadowColor='#fff';ctx.shadowBlur=14;
   ctx.beginPath();ctx.moveTo(sx+wobble,sy-14);ctx.lineTo(sx,sy+6);ctx.stroke();
 
   // Orange trail (fading behind bullet)
