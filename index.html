@@ -686,6 +686,11 @@ function drawSaucer(s){
   ctx.lineWidth=2;
   ctx.beginPath();ctx.ellipse(sx,sy+2,18,4,0,0,Math.PI*2);ctx.stroke();
 
+  // Energy ring pulse (subtle inner glow that pulses)
+  const energyPulse=Math.sin(t*3)*0.3+0.5;
+  ctx.strokeStyle=`rgba(255,204,0,${energyPulse*0.4})`;ctx.lineWidth=1;ctx.shadowBlur=6;
+  ctx.beginPath();ctx.ellipse(sx,sy+2,14,3,0,0,Math.PI*2);ctx.stroke();
+
   // Cockpit window (small oval in center of disc)
   ctx.strokeStyle='rgba(255,255,255,0.6)';ctx.lineWidth=1;ctx.shadowColor='#fff';ctx.shadowBlur=4;
   ctx.beginPath();ctx.ellipse(sx,sy+2,6,2,0,0,Math.PI*2);ctx.stroke();
@@ -900,7 +905,8 @@ function drawCenti(c){
       // === HEAD: Rectangular with antennae (authentic Atari bitmap style) ===
       const dir=c.dirX;
       const sc=getSC();
-      const antWave=Math.sin(t*6)*3; // antenna wave
+      const antWave1=Math.sin(t*6+0.5)*3; // left antenna (phase offset)
+      const antWave2=Math.sin(t*6-0.5)*3; // right antenna (independent)
 
       // Head glow with breathing pulse
       const headPulse=Math.sin(performance.now()/250)*3+10;
@@ -923,9 +929,9 @@ function drawCenti(c){
       ctx.strokeStyle=sc.centiHead;ctx.lineWidth=1.5;ctx.shadowBlur=6;
       const frontX=sx+dir*6; // front edge of head
       ctx.beginPath();ctx.moveTo(frontX,sy-seg.h/2);
-      ctx.lineTo(frontX+dir*5, sy-seg.h/2-6+antWave);ctx.stroke();
+      ctx.lineTo(frontX+dir*5, sy-seg.h/2-6+antWave1);ctx.stroke();
       ctx.beginPath();ctx.moveTo(frontX,sy-seg.h/2+2);
-      ctx.lineTo(frontX+dir*4, sy-seg.h/2-4-antWave);ctx.stroke();
+      ctx.lineTo(frontX+dir*4, sy-seg.h/2-4-antWave1);ctx.stroke();
 
       // Antenna tips (bright dots)
       ctx.fillStyle=sc.centiHead;ctx.shadowBlur=8;
@@ -1570,6 +1576,10 @@ function drawAttract(){
   ctx.fillText(title,W/2-1,titleH-17); // double ghost
 
   ctx.shadowBlur=0;ctx.textAlign='start';
+
+  // Subtle "DEMO" label (authentic: original had this during attract mode)
+  ctx.fillStyle='rgba(255,255,255,0.15)';ctx.font='8px monospace';
+  ctx.fillText('DEMO',W/2-10,titleH+15);
 
   // Apply CRT overlay to attract screen too
   if(scanlinePattern){
