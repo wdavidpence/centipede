@@ -149,12 +149,16 @@ document.addEventListener('keydown',function(e){
   if(gameState==='gameover'&&e.key===' '){startGame();return;}
   if(e.key==='ArrowLeft')keys.left=true;
   if(e.key==='ArrowRight')keys.right=true;
+  if(e.key==='ArrowUp')keys.up=true;
+  if(e.key==='ArrowDown')keys.down=true;
   if(e.key===' ')keys.fire=true;
-  if(['ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();
+  if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(e.key))e.preventDefault();
 });
 document.addEventListener('keyup',function(e){
   if(e.key==='ArrowLeft')keys.left=false;
   if(e.key==='ArrowRight')keys.right=false;
+  if(e.key==='ArrowUp')keys.up=false;
+  if(e.key==='ArrowDown')keys.down=false;
   if(e.key===' ')keys.fire=false;
 });
 
@@ -713,57 +717,31 @@ function drawCenti(c){
     const sx=seg.x, sy=seg.y;
 
     if(i===0){
-      // === HEAD: Vector-style with antennae and eyes ===
+      // === HEAD: Same shape as body segments, different color scheme ===
+      // In original Centipede, head uses identical sprite shape as body but with
+      // a distinct color. The "head" is visually the same oval segment shape.
       const dir=c.dirX;
       const sc=getSC();
 
-      // Outer glow (vector-style neon)
-      ctx.shadowColor=sc.centiHead;ctx.shadowBlur=12;
+      ctx.shadowColor=sc.centiHead;ctx.shadowBlur=8;
       ctx.strokeStyle=sc.centiHead;ctx.lineWidth=2;
 
-      // Head shape - elongated oval
-      ctx.beginPath();ctx.ellipse(sx,sy,seg.w/2+2,seg.h/2+3,0,0,Math.PI*2);ctx.stroke();
+      // Same oval shape as body segments
+      ctx.beginPath();ctx.ellipse(sx,sy,seg.w/2,seg.h/2+1,0,0,Math.PI*2);ctx.stroke();
 
-      // Inner fill with gradient
-      ctx.shadowBlur=6;
-      const headRgba=sc.centiHead.replace('#','');
-      ctx.fillStyle=`rgba(${parseInt(headRgba.slice(0,2),16)},${parseInt(headRgba.slice(2,4),16)},${parseInt(headRgba.slice(4,6),16)},0.4)`;
-      ctx.beginPath();ctx.ellipse(sx,sy,seg.w/3,seg.h/3,0,0,Math.PI*2);ctx.fill();
-
-      // Animated antennae (vector lines)
-      const antWave=Math.sin(t*3)*3;
-      ctx.shadowColor='#ff4422';ctx.shadowBlur=8;
-      ctx.strokeStyle='#ff4422';ctx.lineWidth=1.5;
-      ctx.beginPath();
-      ctx.moveTo(sx-3,sy-seg.h/2-1);
-      ctx.quadraticCurveTo(sx-5+antWave,sy-seg.h/2-8,sx-7+antWave*1.5,sy-seg.h/2-12);
-      ctx.moveTo(sx+3,sy-seg.h/2-1);
-      ctx.quadraticCurveTo(sx+5-antWave,sy-seg.h/2-8,sx+7-antWave*1.5,sy-seg.h/2-12);
-      ctx.stroke();
-
-      // Antennae tips (bright dots)
-      ctx.fillStyle='#ffaa88';
-      ctx.beginPath();ctx.arc(sx-7+antWave*1.5,sy-seg.h/2-12,2,0,Math.PI*2);ctx.fill();
-      ctx.beginPath();ctx.arc(sx+7-antWave*1.5,sy-seg.h/2-12,2,0,Math.PI*2);ctx.fill();
-
-      // Eyes (white with black pupils - looking in movement direction)
+      // Inner fill
       ctx.shadowBlur=4;
-      ctx.fillStyle='#fff';
-      const eyeOff=dir*2;
-      ctx.beginPath();ctx.arc(sx-3+eyeOff,sy-seg.h/5,2.5,0,Math.PI*2);ctx.fill();
-      ctx.beginPath();ctx.arc(sx+3+eyeOff,sy-seg.h/5,2.5,0,Math.PI*2);ctx.fill();
-      ctx.fillStyle='#000';
-      const pupilOff=dir*1.2;
-      ctx.beginPath();ctx.arc(sx-3+eyeOff+pupilOff,sy-seg.h/5,1.2,0,Math.PI*2);ctx.fill();
-      ctx.beginPath();ctx.arc(sx+3+eyeOff+pupilOff,sy-seg.h/5,1.2,0,Math.PI*2);ctx.fill();
+      const headRgba=sc.centiHead.replace('#','');
+      ctx.fillStyle=`rgba(${parseInt(headRgba.slice(0,2),16)},${parseInt(headRgba.slice(2,4),16)},${parseInt(headRgba.slice(4,6),16)},0.5)`;
+      ctx.beginPath();ctx.ellipse(sx,sy,seg.w/3,seg.h/4,0,0,Math.PI*2);ctx.fill();
 
-      // Mandibles (jaws)
+      // Small antennae (original head had tiny feelers)
       ctx.shadowBlur=3;
-      ctx.strokeStyle='#cc2200';ctx.lineWidth=1.5;
-      const jawOpen=Math.sin(t*4)*1+2;
+      const antWave=Math.sin(t*3)*2;
+      ctx.strokeStyle=sc.centiHead;ctx.lineWidth=1;
       ctx.beginPath();
-      ctx.moveTo(sx-3+dir*2,sy+seg.h/4);ctx.lineTo(sx-dir*jawOpen,sy+seg.h/2+jawOpen);
-      ctx.moveTo(sx+3+dir*2,sy+seg.h/4);ctx.lineTo(sx-dir*jawOpen,sy+seg.h/2+jawOpen);
+      ctx.moveTo(sx-2,sy-seg.h/2);ctx.lineTo(sx-3+antWave,sy-seg.h/2-4);
+      ctx.moveTo(sx+2,sy-seg.h/2);ctx.lineTo(sx+3-antWave,sy-seg.h/2-4);
       ctx.stroke();
 
       ctx.shadowBlur=0;
@@ -901,47 +879,33 @@ function drawShip(s){
   // Blink when invincible
   if(invincibleTimer>0&&Math.floor(invincibleTimer/4)%2===0)return;
 
-  // Vector-style ship (Atari authentic)
+  // Player: "somewhat humanoid head" - Atari authentic
+  // Original Centipede player is a small face/head shape with a gun barrel
   ctx.shadowColor='#2288ff';ctx.shadowBlur=10;
-
-  // Main body - triangle/ship shape
   ctx.strokeStyle='#2288ff';ctx.lineWidth=2;
-  ctx.beginPath();
-  ctx.moveTo(sx,sy-10);     // nose
-  ctx.lineTo(sx-12,sy+6);   // left wing tip
-  ctx.lineTo(sx-8,sy+10);   // left engine
-  ctx.lineTo(sx,sy+4);      // center bottom
-  ctx.lineTo(sx+8,sy+10);   // right engine
-  ctx.lineTo(sx+12,sy+6);   // right wing tip
-  ctx.closePath();ctx.stroke();
 
-  // Inner glow
-  ctx.fillStyle='rgba(34,136,255,0.25)';
+  // Head outline (oval)
+  ctx.beginPath();ctx.ellipse(sx,sy,6,7,0,0,Math.PI*2);ctx.stroke();
+  ctx.fillStyle='rgba(34,136,255,0.3)';
   ctx.fill();
 
-  // Cockpit highlight
-  ctx.shadowBlur=6;
-  ctx.strokeStyle='#66bbff';ctx.lineWidth=1.5;
-  ctx.beginPath();ctx.arc(sx,sy-2,3,0,Math.PI*2);ctx.stroke();
+  // Eyes (two dots)
+  ctx.fillStyle='#fff';ctx.shadowBlur=4;
+  ctx.beginPath();ctx.arc(sx-2,sy-2,1.5,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(sx+2,sy-2,1.5,0,Math.PI*2);ctx.fill();
+
+  // Mouth (small line)
+  ctx.strokeStyle='#66bbff';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(sx-2,sy+3);ctx.lineTo(sx+2,sy+3);ctx.stroke();
+
+  // Gun barrel pointing up
+  ctx.shadowColor='#44aaff';ctx.shadowBlur=6;
+  ctx.strokeStyle='#44aaff';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(sx,sy-7);ctx.lineTo(sx,sy-14);ctx.stroke();
+
+  // Gun tip
   ctx.fillStyle='#88ccff';
-  ctx.beginPath();ctx.arc(sx,sy-2,1.5,0,Math.PI*2);ctx.fill();
-
-  // Engine flames
-  const enginePulse=Math.sin(performance.now()/80)*3;
-  ctx.shadowColor='#ff6622';ctx.shadowBlur=8;
-  ctx.strokeStyle='#ff6622';ctx.lineWidth=1.5;
-  // Left flame
-  ctx.beginPath();
-  ctx.moveTo(sx-5,sy+8);ctx.lineTo(sx-4,sy+12+enginePulse);ctx.lineTo(sx-3,sy+8);
-  ctx.stroke();
-  // Right flame
-  ctx.beginPath();
-  ctx.moveTo(sx+3,sy+8);ctx.lineTo(sx+4,sy+12+enginePulse);ctx.lineTo(sx+5,sy+8);
-  ctx.stroke();
-
-  // Crosshair / gun barrel
-  ctx.shadowColor='#44aaff';ctx.shadowBlur=4;
-  ctx.strokeStyle='#44aaff';ctx.lineWidth=1;
+  ctx.beginPath();ctx.arc(sx,sy-14,2,0,Math.PI*2);ctx.fill();
   ctx.beginPath();ctx.moveTo(sx,sy-10);ctx.lineTo(sx,sy-16);ctx.stroke();
   ctx.beginPath();ctx.arc(sx,sy-16,1,0,Math.PI*2);ctx.fill();
 
@@ -1106,7 +1070,7 @@ function drawAttract(){
   // Score table below field
   const scoreStartY=fieldTop+FIELD_H*attractScale+15;
   ctx.fillStyle='#aaa';ctx.font='11px monospace';
-  const scores=[['CENTIPEDE SEGMENT','10'],['CENTIPEDE HEAD','50'],['SCORPION','100'],['SPIDER','75'],['FLYING SAUCER','250']];
+  const scores=[['CENTIPEDE SEGMENT','10'],['CENTIPEDE HEAD','100'],['SCORPION','100'],['SPIDER','75'],['FLYING SAUCER','250']];
   scores.forEach((s,i)=>{
     ctx.fillStyle='#888';ctx.fillText(s[0],W/2-140,scoreStartY+i*16);
     ctx.fillStyle='#ff4';ctx.fillText(s[1],W/2+120,scoreStartY+i*16);
@@ -1236,8 +1200,8 @@ function checkCollisions(){
             addFloatText(seg.x,seg.y,['BONUS!','+200'],'#ff0');
             centipedes.splice(ci,1);playSound('explode');playSound('bonus');
           }else if(sk===0){
-            score+=50;addParticles(seg.x,seg.y,'#ff4422',10);
-            addFloatText(seg.x,seg.y,['HEAD!','+50'],'#f84');
+            score+=100;addParticles(seg.x,seg.y,'#ff4422',10);
+            addFloatText(seg.x,seg.y,['HEAD!','+100'],'#f84');
             // Spawn scorpion from destroyed head (wave 2+)
             if(wave>=2)spawnScorpion(seg.x,seg.y);
             c.segs.splice(0,1);
@@ -1413,13 +1377,17 @@ function loop(){
   }
 
   // Ship movement (field-relative)
-  if(keys.left)ship.x=Math.max(12,ship.x-6);
-  if(keys.right)ship.x=Math.min(FIELD_W-12,ship.x+6);
+  if(keys.left)ship.x=Math.max(8,ship.x-4);
+  if(keys.right)ship.x=Math.min(FIELD_W-8,ship.x+4);
+  // Original Centipede: trackball = full 2D movement
+  if(keys.up)ship.y=Math.max(FIELD_H*0.55,ship.y-4);
+  if(keys.down)ship.y=Math.min(FIELD_H-10,ship.y+4);
 
   // Fire rate with cooldown timer (hold to fire)
   if(keys.fire){
     if(fireTimer<=0){
-      if(bullets.length<5){bullets.push({x:ship.x,y:ship.y-8,dy:-10});fireTimer=FIRE_COOLDOWN;playSound('shoot');}
+      // Original Centipede: only ONE bullet on screen at a time
+      if(bullets.length<1){bullets.push({x:ship.x,y:ship.y-14,dy:-8});fireTimer=FIRE_COOLDOWN;playSound('shoot');}
     }
   }
   if(fireTimer>0)fireTimer--;
