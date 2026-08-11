@@ -127,8 +127,8 @@ function playSound(type){
       // Original: quick ascending fanfare for last segment kill
       [784,988,1175,1568].forEach((f,i)=>{
         const o=ac.createOscillator();const g=ac.createGain();o.type='square';o.frequency.value=f;
-        g.gain.setValueAtTime(0.1,now+i*0.06);g.gain.exponentialRampToValueAtTime(0.001,now+i*0.06+0.08);
-        o.connect(g).connect(ac.destination);o.start(now+i*0.06);o.stop(now+i*0.06+0.1);
+        g.gain.setValueAtTime(0.12,now+i*0.05);g.gain.exponentialRampToValueAtTime(0.001,now+i*0.05+0.07);
+        o.connect(g).connect(ac.destination);o.start(now+i*0.05);o.stop(now+i*0.05+0.09);
       });
     }
   }catch(e){}
@@ -1035,11 +1035,12 @@ function drawAttract(){
   }
   ctx.shadowBlur=0;
 
+  ctx.shadowBlur=0;
   drawFieldBorder();
 
   // Crawling demo centipede (field-relative, rectangular segments)
   const crawlY=FIELD_H*0.35;
-  const crawlX=(t*30)%((FIELD_W+60))-30;
+  const crawlX=(t*40)%((FIELD_W+80))-40;
   const sc=getSC();
   for(let i=0;i<12;i++){
     const sx=crawlX-i*12, sy=crawlY+Math.sin(t*4+i*0.5)*3;
@@ -1120,21 +1121,21 @@ function drawGameOver(){
   // Original: semi-transparent overlay with bold text
   ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fillRect(0,0,W,H);
 
-  ctx.shadowColor='#ff2200';ctx.shadowBlur=15;
-  ctx.strokeStyle='#ff2200';ctx.lineWidth=3;ctx.font='bold 36px monospace';
+  ctx.shadowColor='#ff2200';ctx.shadowBlur=20;
+  ctx.strokeStyle='#ff2200';ctx.lineWidth=3;ctx.font='bold 42px monospace';
   const goText='GAME OVER',goW=ctx.measureText(goText).width;
   ctx.strokeText(goText,W/2-goW/2,H/2-50);
   ctx.shadowBlur=8;
   ctx.fillStyle='rgba(255,34,0,0.4)';
   ctx.fillText(goText,W/2-goW/2,H/2-50);
 
-  ctx.shadowColor='#ff0';ctx.shadowBlur=6;
-  ctx.fillStyle='#ff0';ctx.font='bold 18px monospace';
+  ctx.shadowColor='#ff0';ctx.shadowBlur=8;
+  ctx.fillStyle='#ff0';ctx.font='bold 20px monospace';
   const scText='SCORE: '+score,scW=ctx.measureText(scText).width;
   ctx.fillText(scText,W/2-scW/2,H/2);
 
-  ctx.shadowColor='#4f4';ctx.shadowBlur=4;
-  ctx.fillStyle='#4f4';ctx.font='bold 16px monospace';
+  ctx.shadowColor='#4f4';ctx.shadowBlur=6;
+  ctx.fillStyle='#4f4';ctx.font='bold 18px monospace';
   const wvText='WAVE: '+wave,wvW=ctx.measureText(wvText).width;
   ctx.fillText(wvText,W/2-wvW/2,H/2+35);
 
@@ -1146,7 +1147,7 @@ function drawGameOver(){
   }
 
   const blink=Math.sin(performance.now()/200)>0; // faster blink
-  if(blink){ctx.shadowBlur=0;ctx.fillStyle='#aaa';ctx.font='bold 14px monospace';
+  if(blink){ctx.shadowBlur=0;ctx.fillStyle='#ccc';ctx.font='bold 16px monospace';
     const rt='PRESS SPACE OR TAP TO START',rtW=ctx.measureText(rt).width;
     ctx.fillText(rt,W/2-rtW/2,H/2+95);}
   ctx.shadowBlur=0;
@@ -1299,7 +1300,7 @@ function checkCollisions(){
       lives--;addParticles(ship.x,ship.y,'#2a6aaa',12);playSound('hurt');
       // Screen flash on hit (brief white overlay)
       ctx.fillStyle='rgba(255,255,255,0.3)';ctx.fillRect(0,0,W,H);
-      invincibilityTimer=240;
+      invincibleTimer=240;
       if(lives<=0){gameOver=true;}
       else ship={x:FIELD_W/2,y:FIELD_H-30};
     }
@@ -1422,7 +1423,7 @@ function loop(){
   if(invincibleTimer>0)invincibleTimer--;
 
   // Extra life every 10000 points
-  if(score-extraLifeScore>=10000){extraLifeScore+=10000;lives=Math.min(lives+1,9);addFloatText(ship.x,ship.y-20,['1UP'],'#4f4');playSound('bonus');}
+  if(score-extraLifeScore>=10000){extraLifeScore+=10000;lives=Math.min(lives+1,9);addFloatText(ship.x,ship.y-25,['1UP','EXTRA LIFE'],'#4f4');playSound('bonus');}
 
   // Update effects
   updateParticles();updateFloatText();
