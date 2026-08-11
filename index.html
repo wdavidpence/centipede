@@ -32,6 +32,7 @@ let waveClearMsg='',waveClearFrames=0,nextWaveDelay=0;
 let screenShakeX=0,screenShakeY=0,screenShakeDecay=0;
 let impactFlash=0;
 let scanlineCanvas,scanlineCtx,scanlinePattern;
+let crtOffscreen,crtCtx2d; // Offscreen buffer for CRT barrel distortion
 
 function triggerShake(intensity){screenShakeDecay=intensity||5;}
 function triggerFlash(frames){impactFlash=frames||8;}
@@ -75,6 +76,9 @@ function resize(){
   scanlineCanvas.width=W;scanlineCanvas.height=H;
   for(let y=0;y<H;y+=2){scanlineCtx.fillStyle='rgba(0,0,0,0.15)';scanlineCtx.fillRect(0,y,W,1);}
   scanlinePattern=scanlineCtx.createPattern(scanlineCanvas,'repeat');
+  // Offscreen buffer for barrel distortion
+  if(!crtOffscreen){crtOffscreen=document.createElement('canvas');crtCtx2d=crtOffscreen.getContext('2d');}
+  crtOffscreen.width=W;crtOffscreen.height=H;
 }
 window.addEventListener('resize',function(){
   resize();
@@ -865,7 +869,10 @@ function drawCenti(c){
 
       // Inner fill
       const segRgba=sc.centiHead.replace('#','');
-      ctx.fillStyle=`rgba(${parseInt(segRgba.slice(0,2),16)},${parseInt(segRgba.slice(2,4),16)},${parseInt(segRgba.slice(4,6),16)},0.3)`;
+      // Alternating segment shades for depth (authentic Atari look)
+      const isAlt=(i%2===0);const fillAlpha=isAlt?0.45:0.25;
+      const brightF=isAlt?1.3:1.0;const sr=parseInt(segRgba.slice(0,2),16);const sg=parseInt(segRgba.slice(2,4),16);const sb=parseInt(segRgba.slice(4,6),16);
+      ctx.fillStyle=`rgba(${Math.min(255,sr*brightF)},${Math.min(255,sg*brightF)},${Math.min(255,sb*brightF)},${fillAlpha})`;
       ctx.fillRect(sx-seg.w/3, sy-seg.h/4, seg.w*0.66, seg.h*0.5);
 
       // Animated legs (jumpy, 4-frame animation)
@@ -996,13 +1003,24 @@ function drawFloatText(){
   ctx.globalAlpha=1;ctx.shadowBlur=0;
 }
 
-// === Background grid pattern (arcade authentic vector style) ===
+// === Background (subtle grid dots - authentic Atari playfield) ===
 function drawBackground(){
-  // Pure black background (original had no visible grid)
+  // Pure black background
   ctx.fillStyle='#000';ctx.fillRect(0,0,FIELD_W,FIELD_H);
+
+  // Subtle grid dots at intersections (original Atari had faint playfield markers)
+  ctx.fillStyle='rgba(20,40,20,0.5)';
+  const cellW=FIELD_W/GRID_COLS;
+  const cellH=(FIELD_H-60)/GRID_ROWS;
+  const startY=35;
+  for(let r=0;r<GRID_ROWS;r++){
+    for(let c=0;c<GRID_COLS;c++){
+      ctx.fillRect(c*cellW+cellW/2-0.5, startY+r*cellH+cellH/2-0.5, 1, 1);
+    }
+  }
 }
 
-// === CRT overlay (scanlines + vignette + screen shake + phosphor bloom) ===
+// === CRT overlay (scanlines + vignette + barrel distortion + chromatic aberration) ===
 function drawCRTOverlay(){
   // Screen shake update
   if(screenShakeDecay>0){
@@ -1012,15 +1030,81 @@ function drawCRTOverlay(){
     if(screenShakeDecay<0.3)screenShakeDecay=0;
   }else{screenShakeX=0;screenShakeY=0;}
 
-  // Impact flash
+  // Impact flash (in field coords, before restore)
   if(impactFlash>0){
     ctx.fillStyle=`rgba(255,255,255,${impactFlash/15})`;
     ctx.fillRect(0,0,FIELD_W,FIELD_H);
     impactFlash--;
   }
 
-  // Scanlines (screen-space)
+  // Render to offscreen buffer first
+  crtCtx2d.clearRect(0,0,W,H);
+
+  // Apply barrel distortion + chromatic aberration
+  // Barrel: edges curve inward (classic CRT screen bend)
+  const cx=W/2, cy=H/2;
+  const maxR=Math.sqrt(cx*cx+cy*cy);
+  const barrelK=0.12; // curvature strength (0=no curve, 0.3=heavy)
+  const chromaAmt=2; // chromatic aberration pixel shift
+
+  // Draw each color channel with slight offset for chromatic aberration
+  // Red channel (shifted right)
+  crtCtx2d.save();
+  crtCtx2d.globalCompositeOperation='source-over';
+  // Copy the main canvas to offscreen
+  crtCtx2d.drawImage(canvas,0,0);
+  crtCtx2d.restore();
+
+  // Now apply barrel distortion via pixel manipulation
+  const imgData=crtCtx2d.getImageData(0,0,W,H);
+  const dst=crtCtx2d.createImageData(W,H);
+  const src=imgData.data, d=dst.data;
+
+  // Subsample for performance: process every other pixel in horizontal direction
+  const step=Math.max(1,Math.floor(W/640)); // adapt to screen width
+  for(let y=0;y<H;y++){
+    for(let x=0;x<W;x+=step){
+      // Normalized coords (-1 to 1)
+      const nx=(x-cx)/cx, ny=(y-cy)/cy;
+      const dist=Math.sqrt(nx*nx+ny*ny);
+
+      // Barrel distortion: push pixels outward (inverse mapping)
+      const r2=dist*dist;
+      const barrelFactor=1+barrelK*(r2+r2); // quadratic barrel
+      const sx=(nx*barrelFactor)*cx+cx;
+      const sy=(ny*barrelFactor)*cy+cy;
+
+      // Chromatic aberration: sample R from offset right, B from offset left
+      const chromaX=chromaAmt*dist;
+      const rx=Math.round(sx+chromaX), ry=Math.round(sy);
+      const bx=Math.round(sx-chromaX), by=Math.round(sy);
+
+      // Clamp source coords
+      const rix=Math.max(0,Math.min(W-1,rx)), riy=Math.max(0,Math.min(H-1,ry));
+      const bix=Math.max(0,Math.min(W-1,bx)), biy=Math.max(0,Math.min(H-1,by));
+      const gix=Math.max(0,Math.min(W-1,Math.round(sx))), giy=Math.max(0,Math.min(H-1,Math.round(sy)));
+
+      const ri=(riy*W+rix)*4;
+      const gi=(giy*W+gix)*4;
+      const bi=(biy*W+bix)*4;
+
+      // Fill step-width column
+      for(let s=0;s<step&&x+s<W;s++){
+        const di=(y*W+(x+s))*4;
+        d[di]=src[ri];         // R from right-shifted
+        d[di+1]=src[gi+1];     // G from center
+        d[di+2]=src[bi+2];     // B from left-shifted
+        d[di+3]=src[ri+3];     // A
+      }
+    }
+  }
+  crtCtx2d.putImageData(dst,0,0);
+
+  // Draw CRT-processed image back to main canvas
   ctx.restore(); // exit game transform
+  ctx.drawImage(crtOffscreen,0,0);
+
+  // Scanlines over barrel-distorted image
   if(scanlinePattern){
     ctx.fillStyle=scanlinePattern;
     ctx.fillRect(0,0,W,H);
@@ -1033,13 +1117,12 @@ function drawCRTOverlay(){
   ctx.fillStyle=vg;
   ctx.fillRect(0,0,W,H);
 
-  // Phosphor bloom: subtle colored glow on bright edges
+  // Phosphor bloom: subtle colored glow
   ctx.globalCompositeOperation='screen';
   ctx.fillStyle='rgba(0,255,68,0.015)';
   ctx.fillRect(0,0,W,H);
   ctx.globalCompositeOperation='source-over';
 
-  // Re-apply transform for HUD (which draws in screen coords)
   return true; // signals that we already restored
 }
 
@@ -1075,20 +1158,36 @@ function drawBullet(b){
   ctx.shadowBlur=0;
 }
 
-// === Field border with glow effect ===
+// === Field border with glow effect (authentic Atari cabinet framing) ===
 function drawFieldBorder(){
-  // Original: always green border, not stage-dependent
-  ctx.strokeStyle='#00ff44';ctx.lineWidth=2;ctx.shadowColor='#00ff44';ctx.shadowBlur=8;
+  // Outer border: bright green with strong glow
+  ctx.strokeStyle='#00ff44';ctx.lineWidth=3;ctx.shadowColor='#00ff44';ctx.shadowBlur=12;
   ctx.strokeRect(0,0,FIELD_W,FIELD_H);
 
-  // Inner border (subtle)
-  ctx.strokeStyle='rgba(0,255,68,0.3)';ctx.lineWidth=1;ctx.shadowBlur=4;
-  ctx.strokeRect(2,2,FIELD_W-4,FIELD_H-4);
+  // Inner border line (authentic double-line effect)
+  ctx.strokeStyle='#00ff44';ctx.lineWidth=1.5;ctx.shadowBlur=6;
+  ctx.strokeRect(3,3,FIELD_W-6,FIELD_H-6);
 
-  // Corner decorations
-  ctx.fillStyle='#00ff44';ctx.shadowBlur=6;const cs=5;
-  ctx.fillRect(0,0,cs,cs);ctx.fillRect(FIELD_W-cs,0,cs,cs);
-  ctx.fillRect(0,FIELD_H-cs,cs,cs);ctx.fillRect(FIELD_W-cs,FIELD_H-cs,cs,cs);
+  // Corner brackets (L-shaped, authentic Atari style)
+  ctx.strokeStyle='#00ff44';ctx.lineWidth=3;ctx.shadowBlur=10;
+  const cs=16; // corner size
+
+  // Top-left bracket
+  ctx.beginPath();ctx.moveTo(0,cs);ctx.lineTo(0,0);ctx.lineTo(cs,0);ctx.stroke();
+  // Top-right bracket
+  ctx.beginPath();ctx.moveTo(FIELD_W-cs,0);ctx.lineTo(FIELD_W,0);ctx.lineTo(FIELD_W,cs);ctx.stroke();
+  // Bottom-left bracket
+  ctx.beginPath();ctx.moveTo(0,FIELD_H-cs);ctx.lineTo(0,FIELD_H);ctx.lineTo(cs,FIELD_H);ctx.stroke();
+  // Bottom-right bracket
+  ctx.beginPath();ctx.moveTo(FIELD_W,FIELD_H-cs);ctx.lineTo(FIELD_W,FIELD_H);ctx.lineTo(FIELD_W-cs,FIELD_H);ctx.stroke();
+
+  // Corner dots (bright)
+  ctx.fillStyle='#00ff44';ctx.shadowBlur=8;
+  const dotR=2.5;
+  ctx.beginPath();ctx.arc(0,0,dotR,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(FIELD_W,0,dotR,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(0,FIELD_H,dotR,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(FIELD_W,FIELD_H,dotR,0,Math.PI*2);ctx.fill();
 
   ctx.shadowBlur=0;
 }
@@ -1537,13 +1636,16 @@ function loop(){
   // Handle attract state
   if(gameState==='attract'){drawAttract();requestAnimationFrame(loop);return;}
 
-  // Save and apply scale transform for game area
-  ctx.save();
-  ctx.translate(OX,OY);
-  ctx.scale(SCALE,SCALE);
-
-  // Handle game over state
+  // Handle game over state (before gameplay update)
   if(gameOver){
+    // Save high score on game over
+    if(score>highScore){highScore=score;localStorage.setItem('centipede_highscore',highScore);}
+    if(gameState!=='gameover')playSound('gameover');
+    gameState='gameover';
+
+    // Draw with CRT overlay
+    ctx.save();
+    ctx.translate(OX,OY);ctx.scale(SCALE,SCALE);
     drawBackground();
     for(let i=0;i<mushrooms.length;i++)drawMush(mushrooms[i]);
     for(let i=0;i<centipedes.length;i++)drawCenti(centipedes[i]);
@@ -1554,10 +1656,6 @@ function loop(){
     drawCRTOverlay(); // Apply CRT to game over too
     drawHUD();
     drawGameOver();
-    // Save high score on game over
-    if(score>highScore){highScore=score;localStorage.setItem('centipede_highscore',highScore);}
-    if(gameState!=='gameover')playSound('gameover');
-    gameState='gameover';
     requestAnimationFrame(loop);return;
   }
 
