@@ -542,9 +542,11 @@ function drawScorpion(s){
   ctx.fillStyle='#fff';ctx.shadowBlur=6;
   ctx.beginPath();ctx.arc(sx+tailCurl*1.5,sy+1,1.2,0,Math.PI*2);ctx.fill();
 
-  // Pincers (front) — more aggressive spread
+  // Pincers (front) — more aggressive spread, snaps shut when near player
   const pincerFrame=Math.floor(performance.now()/100)%4;
-  const pincerOpen=[2,6,2,6][pincerFrame];
+  const distToPlayer=ship?Math.hypot(sx-ship.x,sy-ship.y):999;
+  const snapShut=distToPlayer<60; // snaps shut when close to player
+  const pincerOpen=snapShut?[2,3,2,3][pincerFrame]:[2,6,2,6][pincerFrame];
   ctx.strokeStyle='#ff8800';ctx.lineWidth=2;ctx.shadowBlur=8;
   ctx.beginPath();
   ctx.moveTo(sx-3,sy-9);ctx.lineTo(sx-7-pincerOpen,sy-12);
@@ -1307,6 +1309,14 @@ function drawCRTOverlay(){
   ctx.fillStyle=`rgba(0,0,0,${flickerAlpha})`;
   ctx.fillRect(0,0,W,H);
 
+  // Subtle phosphor glow around bright elements (CRT persistence bloom)
+  ctx.globalCompositeOperation='screen';
+  ctx.fillStyle='rgba(0,255,68,0.012)'; // green phosphor bleed
+  ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='rgba(255,100,0,0.008)'; // warm phosphor bleed
+  ctx.fillRect(0,0,W,H);
+  ctx.globalCompositeOperation='source-over';
+
   // Scanlines over barrel-distorted image
   if(scanlinePattern){
     ctx.fillStyle=scanlinePattern;
@@ -1514,6 +1524,12 @@ function drawAttract(){
   ctx.shadowColor='#fff';ctx.shadowBlur=8*pulse;
   ctx.strokeStyle='rgba(255,255,255,0.3)';ctx.lineWidth=1;
   ctx.strokeText(title,W/2,titleH-7);
+
+  // CRT burn-in ghosting: faint afterimage slightly offset
+  ctx.fillStyle='rgba(255,34,0,0.08)';ctx.shadowBlur=0;
+  ctx.fillText(title,W/2+1,titleH-15); // slight offset ghost
+  ctx.fillStyle='rgba(255,34,0,0.05)';
+  ctx.fillText(title,W/2-1,titleH-17); // double ghost
 
   ctx.shadowBlur=0;ctx.textAlign='start';
 
