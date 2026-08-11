@@ -604,6 +604,10 @@ function spawnSaucer(){
 }
 
 function updateSaucer(s){
+  // Subtle hover bobbing (authentic Atari: saucers bob up/down slightly)
+  s.bobPhase=(s.bobPhase||0)+0.08;
+  s.bobY=Math.sin(s.bobPhase)*2;
+
   s.x+=s.dirX;
   s.animPhase+=0.1;
 
@@ -641,7 +645,7 @@ function updateSaucer(s){
 }
 
 function drawSaucer(s){
-  const sx=s.x, sy=s.y;
+  const sx=s.x, sy=s.y+(s.bobY||0);
   const t=s.animPhase;
 
   // Enhanced saucer: golden dome with detailed lights
@@ -1009,6 +1013,11 @@ function drawCenti(c){
       ctx.fillRect(sx-seg.w/3, sy-seg.h/4, seg.w*0.66, seg.h*0.5);
 
       // Animated legs (jumpy, 4-frame animation)
+      // Tiny leg shadow beneath each foot
+      ctx.fillStyle='rgba(0,0,0,0.15)';ctx.shadowBlur=0;
+      ctx.beginPath();ctx.arc(sx-seg.w/3+legPos,sy+seg.h/2+legLen+1,1.5,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(sx+seg.w/3-legPos,sy+seg.h/2+legLen+1,1.5,0,Math.PI*2);ctx.fill();
+
       ctx.strokeStyle=segColor;ctx.lineWidth=1;ctx.shadowBlur=4;
       const legLen=3;
       // Left leg
@@ -1052,6 +1061,10 @@ function drawMush(m){
   // Cap - half-ellipse with thicker stroke (authentic bitmap look)
   ctx.lineWidth=2.5;ctx.shadowBlur=10;
   ctx.beginPath();ctx.arc(sx,sy,m.w/2,Math.PI,0);ctx.stroke();
+
+  // Specular highlight on cap (tiny white reflection)
+  ctx.fillStyle='rgba(255,255,255,0.15)';ctx.shadowBlur=0;
+  ctx.beginPath();ctx.arc(sx-m.w*0.15,sy-m.w*0.2,m.w*0.12,0,Math.PI*2);ctx.fill();
 
   // Cap fill with gradient for depth
   const capGrad=ctx.createRadialGradient(sx,sy-m.w*0.2,1,sx,sy,m.w/2);
@@ -1734,6 +1747,9 @@ function drawAttract(){
     // Right column: score value in bright yellow
     ctx.shadowColor='#ff4';ctx.shadowBlur=6;
     ctx.fillStyle='#ff4';ctx.fillText(s[1],W/2+130,yy);
+    // CRT phosphor glow: faint afterimage
+    ctx.fillStyle='rgba(255,255,68,0.1)';ctx.shadowBlur=12;
+    ctx.fillText(s[1],W/2+130,yy);
   });
   ctx.shadowBlur=0;
 
