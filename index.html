@@ -695,6 +695,10 @@ function drawSaucer(s){
 
   
 
+  // Shadow beneath saucer (authentic: darker spot on playfield)
+  ctx.fillStyle='rgba(0,0,0,0.25)';ctx.shadowBlur=0;
+  ctx.beginPath();ctx.ellipse(sx,sy+14,20,4,0,0,Math.PI*2);ctx.fill();
+
   // Engine glow underneath dome (subtle blue-white exhaust)
   const enginePulse=Math.sin(t*5)*0.3+0.5;
   ctx.fillStyle=`rgba(150,200,255,${enginePulse*0.4})`;ctx.shadowColor='#88ccff';ctx.shadowBlur=12;
@@ -876,7 +880,9 @@ function drawCenti(c){
       const sc=getSC();
       const antWave=Math.sin(t*6)*3; // antenna wave
 
-      ctx.shadowColor=sc.centiHead;ctx.shadowBlur=10;
+      // Head glow with breathing pulse
+      const headPulse=Math.sin(performance.now()/250)*3+10;
+      ctx.shadowColor=sc.centiHead;ctx.shadowBlur=headPulse;
       ctx.strokeStyle=sc.centiHead;ctx.lineWidth=2.5;
 
       // Head body - rectangular, wider than body segments
@@ -1341,18 +1347,20 @@ function drawCRTOverlay(){
 // === Bullet drawing (field-relative) - enhanced with trail + glow ===
 function drawBullet(b){
   const sx=b.x, sy=b.y;
+  // Slight wobble for organic dart feel
+  const wobble=Math.sin(performance.now()/60+b.y*0.3)*0.5;
 
   // Main dart: bright white with intense glow
   ctx.shadowColor='#ffffff';ctx.shadowBlur=15;
   ctx.strokeStyle='#ffffff';ctx.lineWidth=3.5;
 
-  // Bullet body (bright line)
-  ctx.beginPath();ctx.moveTo(sx,sy-14);ctx.lineTo(sx,sy+6);ctx.stroke();
+  // Bullet body (bright line) with wobble
+  ctx.beginPath();ctx.moveTo(sx+wobble,sy-14);ctx.lineTo(sx,sy+6);ctx.stroke();
 
   // Orange trail (fading behind bullet)
   ctx.shadowBlur=10;
   ctx.strokeStyle='rgba(255,200,50,0.7)';ctx.lineWidth=6;
-  ctx.beginPath();ctx.moveTo(sx,sy-8);ctx.lineTo(sx,sy+6);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(sx+wobble*0.5,sy-8);ctx.lineTo(sx,sy+6);ctx.stroke();
 
   // Faint outer trail
   ctx.shadowBlur=6;
@@ -1361,11 +1369,11 @@ function drawBullet(b){
 
   // Bright tip (white-hot point)
   ctx.fillStyle='#ffffff';ctx.shadowColor='#fff';ctx.shadowBlur=14;
-  ctx.beginPath();ctx.arc(sx,sy-14,3,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(sx+wobble,sy-14,3,0,Math.PI*2);ctx.fill();
 
   // Inner core (even brighter)
   ctx.fillStyle='#fff';ctx.shadowBlur=8;
-  ctx.beginPath();ctx.arc(sx,sy-14,1.5,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(sx+wobble,sy-14,1.5,0,Math.PI*2);ctx.fill();
 
   ctx.shadowBlur=0;
 }
