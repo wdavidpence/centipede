@@ -171,12 +171,14 @@ function playSound(type){
 
 // === Utility functions - all use field-relative coords, convert to screen in draw ===
 function addParticles(fx,fy,color,count,spread){
+  // If color is a string, use it; if it's an array, cycle through colors (multi-color explosions)
+  const colors=Array.isArray(color)?color:[color];
   // spread: how fast particles fly outward (default 4)
   const s = spread || 4;
   for(let i=0;i<count;i++){
     const angle = Math.random()*Math.PI*2;
     const speed = (Math.random()*0.7+0.3)*s;
-    particles.push({x:fx,y:fy,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,life:20+Math.random()*15,color,size:1.5+Math.random()*2});
+    particles.push({x:fx,y:fy,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,life:20+Math.random()*15,color:colors[i%colors.length],size:1.5+Math.random()*2});
   }
 }
 
@@ -1033,14 +1035,15 @@ function drawShip(s){
   ctx.fillStyle='rgba(34,136,255,0.3)';
   ctx.fillRect(sx-4,sy-2,8,10);
 
-  // Head (circle on top)
-  ctx.beginPath();ctx.arc(sx,sy-5,4,0,Math.PI*2);ctx.stroke();
+  // Head (circle on top) with idle breathing
+  const breathe=Math.sin(performance.now()/400)*0.5; // subtle breathing
+  ctx.beginPath();ctx.arc(sx,sy-5+breathe,4+breathe*0.3,0,Math.PI*2);ctx.stroke();
   ctx.fillStyle='rgba(34,136,255,0.4)';ctx.fill();
 
   // Eyes
   ctx.fillStyle='#fff';ctx.shadowBlur=4;
-  ctx.beginPath();ctx.arc(sx-1.5,sy-5.5,1.2,0,Math.PI*2);ctx.fill();
-  ctx.beginPath();ctx.arc(sx+1.5,sy-5.5,1.2,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(sx-1.5,sy-5.5+breathe,1.2,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(sx+1.5,sy-5.5+breathe,1.2,0,Math.PI*2);ctx.fill();
 
   // Gun barrel (pointing up from center)
   ctx.shadowColor='#44aaff';ctx.shadowBlur=8;
@@ -1573,6 +1576,15 @@ function drawAttract(){
   ctx.beginPath();ctx.arc(crawlX-60,bulletY-6,2.5,0,Math.PI*2);ctx.fill();
   ctx.shadowBlur=0;
 
+  // Saucer fire (downward bolt from saucer)
+  const saucFireY=saucerY+10+Math.sin(t*6)*8;
+  ctx.shadowColor='#ff2200';ctx.shadowBlur=12;
+  ctx.strokeStyle='#ff2200';ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(saucerX+12,saucFireY-6);ctx.lineTo(saucerX+12,saucFireY+8);ctx.stroke();
+  ctx.fillStyle='#ffcc00';ctx.shadowBlur=8;
+  ctx.beginPath();ctx.arc(saucerX+12,saucFireY+8,2.5,0,Math.PI*2);ctx.fill();
+  ctx.shadowBlur=0;
+
   // Demo player gunner (bottom center)
   const gunX=crawlX-60,gunY=FIELD_H-40;
   ctx.shadowColor='#2288ff';ctx.shadowBlur=8;
@@ -1802,11 +1814,11 @@ function checkCollisions(){
           bullets.splice(bi,1);bulletHit=true;
 
           if(c.segs.length===1){
-            score+=200;addParticles(seg.x,seg.y,'#ff4422',25,8);triggerShake(6);triggerFlash(5);
+            score+=200;addParticles(seg.x,seg.y,['#ff4422','#fff','#ffcc00'],25,8);triggerShake(6);triggerFlash(5);
             addFloatText(seg.x,seg.y,['BONUS!','+200'],'#ff0');
             centipedes.splice(ci,1);playSound('explode');playSound('bonus');
           }else if(sk===0){
-            score+=100;addParticles(seg.x,seg.y,'#ff4422',20,6);triggerShake(4);
+            score+=100;addParticles(seg.x,seg.y,['#ff4422','#fff','#ffcc00'],20,6);triggerShake(4);
             addFloatText(seg.x,seg.y,['HEAD!','+100'],'#f84');
             // Spawn scorpion from destroyed head (wave 2+)
             if(wave>=2)spawnScorpion(seg.x,seg.y);
@@ -1845,7 +1857,7 @@ function checkCollisions(){
       const s=scorpions[si];
       if(s.state==='moving'&&Math.hypot(b.x-s.x,b.y-s.y)<8){
         bullets.splice(bi,1);scorpionHit=true;
-        score+=100;addParticles(s.x,s.y,'#ff6600',20,5);
+        score+=100;addParticles(s.x,s.y,['#ff6600','#ffcc00','#fff'],20,5);
         addFloatText(s.x,s.y,['SCORPION','+100'],'#fa0');
         scorpions.splice(si,1);playSound('explode');
       }
@@ -1859,7 +1871,7 @@ function checkCollisions(){
       const s=saucers[si];
       if(Math.hypot(b.x-s.x,b.y-(s.y))<16){
         bullets.splice(bi,1);saucerHit=true;
-        score+=250;addParticles(s.x,s.y,'#ffcc00',20,6);
+        score+=250;addParticles(s.x,s.y,['#ffcc00','#fff','#fff8e0'],20,6);
         addFloatText(s.x,s.y,['SAUCER','+250'],'#f0f');
         saucers.splice(si,1);playSound('explode');
       }
@@ -1873,7 +1885,7 @@ function checkCollisions(){
       const s=spiders[si];
       if(s.state==='jumping'&&Math.hypot(b.x-s.x,b.y-s.y)<8){
         bullets.splice(bi,1);spiderHit=true;
-        score+=75;addParticles(s.x,s.y,'#ff00aa',16,5);
+        score+=75;addParticles(s.x,s.y,['#ff00aa','#ff44cc','#fff'],16,5);
         addFloatText(s.x,s.y,['SPIDER','+75'],'#f0a');
         spiders.splice(si,1);playSound('hit');
       }
@@ -1912,7 +1924,7 @@ function checkCollisions(){
       }
     }
     if(hit){
-      lives--;addParticles(ship.x,ship.y,'#2a6aaa',12);playSound('hurt');triggerShake(8);triggerFlash(10);
+      lives--;addParticles(ship.x,ship.y,['#2a6aaa','#44aaff','#fff'],12);playSound('hurt');triggerShake(8);triggerFlash(10);
       // Screen flash on hit (brief white overlay)
       ctx.fillStyle='rgba(255,255,255,0.3)';ctx.fillRect(0,0,W,H);
       invincibleTimer=240;
