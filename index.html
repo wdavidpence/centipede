@@ -1304,15 +1304,29 @@ function drawBackground(){
   // Pure black background
   ctx.fillStyle='#000';ctx.fillRect(0,0,FIELD_W,FIELD_H);
 
-  // Subtle grid dots at intersections (original Atari had faint playfield markers)
-  ctx.fillStyle='rgba(15,30,15,0.2)';
+  // Authentic Atari playfield: subtle cross-hair grid at intersections
+  ctx.fillStyle='rgba(15,30,15,0.12)';
   const cellW=FIELD_W/GRID_COLS;
   const cellH=(FIELD_H-60)/GRID_ROWS;
   const startY=35;
   for(let r=0;r<GRID_ROWS;r++){
     for(let c=0;c<GRID_COLS;c++){
-      ctx.fillRect(c*cellW+cellW/2-0.5, startY+r*cellH+cellH/2-0.5, 1, 1);
+      const px=c*cellW+cellW/2;
+      const py=startY+r*cellH+cellH/2;
+      // Cross pattern instead of single dot (authentic Atari style)
+      ctx.fillRect(px-0.5,py-0.5,1,1);
+      ctx.fillRect(px-1.5,py,0.5,0.5);
+      ctx.fillRect(px+1,py,0.5,0.5);
+      ctx.fillRect(px,py-1.5,0.5,0.5);
+      ctx.fillRect(px,py+1,0.5,0.5);
     }
+  }
+
+  // Subtle horizontal lane lines (every 2 rows) - guides the eye down the field
+  ctx.strokeStyle='rgba(15,30,15,0.06)';ctx.lineWidth=0.5;
+  for(let r=0;r<GRID_ROWS;r+=2){
+    const py=startY+r*cellH;
+    ctx.beginPath();ctx.moveTo(4,py);ctx.lineTo(FIELD_W-4,py);ctx.stroke();
   }
 }
 
