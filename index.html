@@ -849,6 +849,11 @@ function drawCenti(c){
       ctx.beginPath();ctx.arc(frontX+dir*5, sy-seg.h/2-6+antWave,1.5,0,Math.PI*2);ctx.fill();
       ctx.beginPath();ctx.arc(frontX+dir*4, sy-seg.h/2-4-antWave,1.5,0,Math.PI*2);ctx.fill();
 
+      // Eyes (white dots on front of head)
+      ctx.fillStyle='#fff';ctx.shadowBlur=4;
+      ctx.beginPath();ctx.arc(frontX-1, sy-seg.h/2+1, 1.8,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(frontX+1, sy-seg.h/2+3, 1.8,0,Math.PI*2);ctx.fill();
+
       ctx.shadowBlur=0;
     }else if(i===c.segs.length-1){
       // === TAIL: Smaller rectangle with gentle wag (original style) ===
@@ -1261,8 +1266,14 @@ function drawBullet(b){
 
 // === Field border with glow effect (authentic Atari cabinet framing) ===
 function drawFieldBorder(){
+  // Animated pulse on border (subtle CRT phosphor effect)
+  const t=performance.now()/400;
+  const borderPulse=Math.sin(t)*2+8; // blur oscillates between 6-10
+  const borderAlpha=0.7+Math.sin(t*0.5)*0.3; // brightness oscillation
+
   // Outer border: bright green with strong glow
-  ctx.strokeStyle='#00ff44';ctx.lineWidth=3;ctx.shadowColor='#00ff44';ctx.shadowBlur=12;
+  ctx.strokeStyle=`rgba(0,255,68,${borderAlpha})`;ctx.lineWidth=3;
+  ctx.shadowColor='#00ff44';ctx.shadowBlur=borderPulse;
   ctx.strokeRect(0,0,FIELD_W,FIELD_H);
 
   // Inner border line (authentic double-line effect)
@@ -1477,16 +1488,27 @@ function drawAttract(){
     ctx.fillText(hs,W/2-hsw/2,scoreStartY+scores.length*14+10);ctx.shadowBlur=0;
   }
 
-  // Blinking start prompt at bottom
+  // Blinking start prompt at bottom (authentic arcade style)
   const blink=Math.sin(performance.now()/250)>0;
   if(blink){
-    ctx.shadowColor='#ff4';ctx.shadowBlur=8;
-    ctx.strokeStyle='#ff4';ctx.lineWidth=2;ctx.font='bold 14px monospace';
+    ctx.textAlign='center';
+    // Multi-layer glow for "PRESS SPACE OR TAP TO START"
+    ctx.shadowColor='#ff4';ctx.shadowBlur=20;
+    ctx.strokeStyle='#ff4';ctx.lineWidth=3;ctx.font='bold 16px monospace';
     const st='PRESS SPACE OR TAP TO START',stw=ctx.measureText(st).width;
-    ctx.strokeText(st,W/2-stw/2,H-promptH+12);
-    ctx.fillStyle='rgba(255,255,68,0.3)';
-    ctx.fillText(st,W/2-stw/2,H-promptH+12);
+    ctx.strokeText(st,W/2,H-promptH+14);
+
+    ctx.shadowBlur=8;ctx.lineWidth=1.5;
+    ctx.strokeText(st,W/2,H-promptH+14);
+
+    const promptGrad=ctx.createLinearGradient(W/2-stw/2,H-promptH-2,W/2+stw/2,H-promptH+14);
+    promptGrad.addColorStop(0,'rgba(255,255,68,0.3)');
+    promptGrad.addColorStop(0.5,'rgba(255,255,68,0.7)');
+    promptGrad.addColorStop(1,'rgba(255,255,68,0.3)');
+    ctx.fillStyle=promptGrad;
+    ctx.fillText(st,W/2,H-promptH+14);
     ctx.shadowBlur=0;
+    ctx.textAlign='start';
   }
 }
 
@@ -1884,14 +1906,23 @@ function loop(){
   for(let i=0;i<spiders.length;i++)drawSpider(spiders[i]);
   for(let i=0;i<saucers.length;i++)drawSaucer(saucers[i]);
   for(let i=0;i<bullets.length;i++)drawBullet(bullets[i]);
-  // Draw saucer bullets (field-relative) - original: red/orange downward bolts
+  // Draw saucer bullets (field-relative) - enhanced downward bolts with trail
   for(let i=0;i<saucerBullets.length;i++){
     const sb=saucerBullets[i];
-    ctx.shadowColor='#ff0000';ctx.shadowBlur=10;
-    ctx.strokeStyle='#ff2200';ctx.lineWidth=3;
-    ctx.beginPath();ctx.moveTo(sb.x,sb.y-6);ctx.lineTo(sb.x,sb.y+6);ctx.stroke();
-    ctx.fillStyle='#ffaa00';ctx.shadowBlur=6;
-    ctx.beginPath();ctx.arc(sb.x,sb.y+6,2.5,0,Math.PI*2);ctx.fill();
+    // Main bolt (red with glow)
+    ctx.shadowColor='#ff2200';ctx.shadowBlur=14;
+    ctx.strokeStyle='#ff2200';ctx.lineWidth=3.5;
+    ctx.beginPath();ctx.moveTo(sb.x,sb.y-8);ctx.lineTo(sb.x,sb.y+8);ctx.stroke();
+    // Trail (orange, fading)
+    ctx.shadowBlur=8;
+    ctx.strokeStyle='rgba(255,170,0,0.6)';ctx.lineWidth=6;
+    ctx.beginPath();ctx.moveTo(sb.x,sb.y-4);ctx.lineTo(sb.x,sb.y+6);ctx.stroke();
+    // Bright tip (yellow-white)
+    ctx.fillStyle='#ffcc00';ctx.shadowColor='#ffcc00';ctx.shadowBlur=12;
+    ctx.beginPath();ctx.arc(sb.x,sb.y+8,3,0,Math.PI*2);ctx.fill();
+    // Inner core
+    ctx.fillStyle='#fff';ctx.shadowBlur=6;
+    ctx.beginPath();ctx.arc(sb.x,sb.y+8,1.5,0,Math.PI*2);ctx.fill();
     ctx.shadowBlur=0;
   }
   if(ship)drawShip(ship);
