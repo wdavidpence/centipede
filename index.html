@@ -206,7 +206,7 @@ function spawnCenti(offset){
   const fromLeft=(wave%2===1);
   const dirX=fromLeft?1:-1;
   const startX=fromLeft?-5:FIELD_W+5;
-  // Original Centipede: odd waves fast, even waves slow
+  // Original: odd waves fast, even waves slow (with slight wave-based scaling)
   const isFastWave = (wave % 2 === 1);
   // Fast waves: ~2px/frame, slow waves: ~0.75px/frame (authentic pacing)
   const spd = isFastWave ? 2.0 : 0.75;
@@ -543,7 +543,7 @@ function updateSaucer(s){
       speed: 2.5+Math.min(wave*0.1,2.5),
       state: 'falling', // 'falling','jumping'
       fallSpeed: 4,
-      jumpTimer: 0,
+      jumpTimer: 30,
       dirX: (Math.random()>0.5?1:-1),
       animPhase: Math.random()*Math.PI*2,
       legAnim: 0
@@ -552,7 +552,7 @@ function updateSaucer(s){
   }
 
   // Saucer shoots at player (original mechanic) - tuned rate
-  if(!s.shootTimer)s.shootTimer=40+Math.random()*50;
+  if(!s.shootTimer)s.shootTimer=20+Math.random()*30;
   s.shootTimer--;
   if(s.shootTimer<=0){
     // Fire a bullet downward toward player
@@ -1190,8 +1190,6 @@ function checkCollisions(){
             score+=200;addParticles(seg.x,seg.y,'#ff4422',25,8);
             addFloatText(seg.x,seg.y,['BONUS!','+200'],'#ff0');
             centipedes.splice(ci,1);playSound('explode');playSound('bonus');
-            // Screen flash on bonus kill
-            ctx.fillStyle='rgba(255,100,50,0.2)';ctx.fillRect(0,0,W/H*FIELD_W,FIELD_H);
           }else if(sk===0){
             score+=100;addParticles(seg.x,seg.y,'#ff4422',20,6);
             addFloatText(seg.x,seg.y,['HEAD!','+100'],'#f84');
@@ -1281,21 +1279,21 @@ function checkCollisions(){
     if(!hit){
       for(let si=0;si<scorpions.length&&!hit;si++){
         const s=scorpions[si];
-        if(s.state==='moving'&&Math.hypot(ship.x-s.x,ship.y-s.y)<20){hit=true;}
+        if(s.state==='moving'&&Math.hypot(ship.x-s.x,ship.y-s.y)<18){hit=true;}
       }
     }
     // Ship-spider collision
     if(!hit){
       for(let si=0;si<spiders.length&&!hit;si++){
         const s=spiders[si];
-        if(s.state==='jumping'&&Math.hypot(ship.x-s.x,ship.y-s.y)<20){hit=true;}
+        if(s.state==='jumping'&&Math.hypot(ship.x-s.x,ship.y-s.y)<16){hit=true;}
       }
     }
     // Ship-saucer bullet collision
     if(!hit){
       for(let si=0;si<saucerBullets.length&&!hit;si++){
         const sb=saucerBullets[si];
-        if(Math.hypot(ship.x-sb.x,ship.y-sb.y)<16){hit=true;saucerBullets.splice(si,1);}
+        if(Math.hypot(ship.x-sb.x,ship.y-sb.y)<14){hit=true;saucerBullets.splice(si,1);}
       }
     }
     if(hit){
@@ -1315,7 +1313,7 @@ function checkWaveClear(){
     waveClearMsg='WAVE CLEARED!';waveClearFrames=150;playSound('waveclear');
     // Bonus points for remaining mushrooms
     const mushBonus=mushrooms.length*10;
-    if(mushBonus>0){score+=mushBonus;addFloatText(FIELD_W/2,FIELD_H/2-10,['MUSH BONUS','+'+mushBonus,'#pts'],'#4f4');}
+    if(mushBonus>0){score+=mushBonus;addFloatText(FIELD_W/2,FIELD_H/2-10,['MUSH BONUS','+'+mushBonus],'#4f4');}
   }
 }
 
