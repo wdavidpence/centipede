@@ -888,6 +888,13 @@ function drawCenti(c){
       ctx.beginPath();ctx.arc(frontX-1, sy-seg.h/2+1, 1.8,0,Math.PI*2);ctx.fill();
       ctx.beginPath();ctx.arc(frontX+1, sy-seg.h/2+3, 1.8,0,Math.PI*2);ctx.fill();
 
+      // Mandibles (small jaw lines below eyes)
+      ctx.strokeStyle=segColor;ctx.lineWidth=1.5;ctx.shadowBlur=3;
+      ctx.beginPath();ctx.moveTo(frontX-2, sy+seg.h/2);
+      ctx.lineTo(frontX-dir*4, sy+seg.h/2+3);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(frontX+2, sy+seg.h/2);
+      ctx.lineTo(frontX-dir*3, sy+seg.h/2+4);ctx.stroke();
+
       ctx.shadowBlur=0;
         }else if(i===c.segs.length-1){
       // === TAIL: Tapered segment with pronounced wag (authentic Atari look) ===
@@ -1568,7 +1575,21 @@ function drawAttract(){
     ctx.beginPath();ctx.moveTo(spidX-5,ly);ctx.lineTo(spidX-10-spidLP,ly-1);ctx.lineTo(spidX-13-spidLP*1.5,ly+3);ctx.stroke();
     ctx.beginPath();ctx.moveTo(spidX+5,ly);ctx.lineTo(spidX+10+spidLP,ly-1);ctx.lineTo(spidX+13+spidLP*1.5,ly+3);ctx.stroke();
   }
-  ctx.shadowBlur=0;  // Demo bullet (firing upward toward centipede)
+  ctx.shadowBlur=0;  // Demo explosion (flashing near centipede head when bullet "hits")
+  const explFlash=Math.sin(t*10); // rapid flash
+  if(explFlash>0.5){
+    const explX=crawlX, explY=crawlY;
+    for(let e=0;e<8;e++){
+      const angle=e*Math.PI/4+t*2;
+      const dist=(explFlash-0.5)*15+3;
+      ctx.fillStyle=`rgba(255,${Math.floor(100+e*20)},0,${explFlash})`;
+      ctx.shadowColor='#ff4400';ctx.shadowBlur=6;
+      ctx.beginPath();ctx.arc(explX+Math.cos(angle)*dist,explY+Math.sin(angle)*dist,2.5,0,Math.PI*2);ctx.fill();
+    }
+    ctx.shadowBlur=0;
+  }
+
+  // Demo bullet (firing upward toward centipede)
   const bulletY=crawlY-30+Math.sin(t*8)*10;
   ctx.shadowColor='#fff';ctx.shadowBlur=14;
   ctx.strokeStyle='#fff';ctx.lineWidth=3.5;
