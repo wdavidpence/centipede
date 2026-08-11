@@ -522,7 +522,9 @@ function drawScorpion(s){
   ctx.strokeStyle='#ff6600';ctx.lineWidth=2.5;
 
   // Main body (oval)
-  ctx.beginPath();ctx.ellipse(sx,sy,7,5,0,0,Math.PI*2);ctx.stroke();
+  // Subtle breathing: body size pulses slightly
+  const scorpBreathe=Math.sin(performance.now()/300)*0.5;
+  ctx.beginPath();ctx.ellipse(sx,sy,7+scorpBreathe*0.3,5+scorpBreathe*0.2,0,0,Math.PI*2);ctx.stroke();
   const bodyGrad=ctx.createRadialGradient(sx,sy,1,sx,sy,7);
   bodyGrad.addColorStop(0,'rgba(255,102,0,0.4)');
   bodyGrad.addColorStop(1,'rgba(255,102,0,0.1)');
@@ -991,6 +993,12 @@ function drawCenti(c){
       ctx.fillStyle=sc.centiHead;ctx.shadowBlur=6;
       ctx.beginPath();ctx.arc(tx+tailWag*0.5, sy+seg.h/2+4, 1.5,0,Math.PI*2);ctx.fill();
 
+      // Tiny trail particles behind tail tip (authentic: dust trail)
+      if(Math.random()>0.7){
+        particles.push({x:tx+tailWag*0.5,y:sy+seg.h/2+4,vx:(Math.random()-0.5)*1,vy:Math.random()*1+0.5,
+          life:10+Math.random()*8,color:segColor,size:1+Math.random()});
+      }
+
       ctx.shadowBlur=0;
     }else{
       // === BODY SEGMENTS: Rectangular shape with jumpy leg animation ===
@@ -1351,6 +1359,13 @@ function drawCRTOverlay(){
   const flickerAlpha=0.01+Math.random()*0.015;
   ctx.fillStyle=`rgba(0,0,0,${flickerAlpha})`;
   ctx.fillRect(0,0,W,H);
+
+  // Dot crawl (subtle horizontal banding - real CRT artifact)
+  const crawlPhase=performance.now()/200;
+  ctx.fillStyle=`rgba(0,0,0,${0.008+Math.sin(crawlPhase)*0.004})`;
+  for(let cy=0;cy<H;cy+=8){
+    ctx.fillRect(0,cy,W,1);
+  }
 
   // Subtle phosphor glow around bright elements (CRT persistence bloom)
   ctx.globalCompositeOperation='screen';
