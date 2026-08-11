@@ -1047,33 +1047,33 @@ function drawAttract(){
   ctx.shadowBlur=0;
   ctx.restore();
 
-  // Score table below field
+  // Score table below field (more readable layout)
   const scoreStartY=fieldTop+FIELD_H*attractScale+15;
-  ctx.fillStyle='#aaa';ctx.font='11px monospace';
+  ctx.font='11px monospace';
   const scores=[['CENTIPEDE SEGMENT','10'],['CENTIPEDE HEAD','100'],['SCORPION','100'],['SPIDER','75'],['FLYING SAUCER','250']];
   scores.forEach((s,i)=>{
-    ctx.fillStyle='#888';ctx.fillText(s[0],W/2-140,scoreStartY+i*16);
-    ctx.fillStyle='#ff4';ctx.fillText(s[1],W/2+120,scoreStartY+i*16);
+    ctx.fillStyle='#aaa';ctx.fillText(s[0],W/2-150,scoreStartY+i*18);
+    ctx.fillStyle='#ff4';ctx.fillText(s[1],W/2+130,scoreStartY+i*18);
   });
 
-  // High score
+  // High score (prominent display)
   if(highScore>0){
     ctx.fillStyle='#ff0';ctx.font='bold 12px monospace';ctx.shadowColor='#ff0';ctx.shadowBlur=6;
     const hs='HIGH SCORE: '+highScore,hsw=ctx.measureText(hs).width;
-    ctx.fillText(hs,W/2-hsw/2,scoreStartY+scores.length*16+15);ctx.shadowBlur=0;
+    ctx.fillText(hs,W/2-hsw/2,scoreStartY+scores.length*18+15);ctx.shadowBlur=0;
   }
 
   // Blinking start prompt at bottom
   const blink=Math.sin(performance.now()/250)>0;
   if(blink){
-    ctx.shadowColor='#ff4';ctx.shadowBlur=10;
+    ctx.shadowColor='#ff4';ctx.shadowBlur=8;
     ctx.strokeStyle='#ff4';ctx.lineWidth=2;ctx.font='bold 16px monospace';
-    const start='PRESS SPACE OR TAP',startw=ctx.measureText(start).width;
-    ctx.strokeText(start,W/2-startw/2,H-15);
+    const st='PRESS SPACE OR TAP TO START',stw=ctx.measureText(st).width;
+    ctx.strokeText(st,W/2-stw/2,H-promptH+15);
     ctx.fillStyle='rgba(255,255,68,0.3)';
-    ctx.fillText(start,W/2-startw/2,H-15);
+    ctx.fillText(st,W/2-stw/2,H-promptH+15);
+    ctx.shadowBlur=0;
   }
-  ctx.shadowBlur=0;
 }
 
 // === Wave clear message with animation ===
