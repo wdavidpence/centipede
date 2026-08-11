@@ -1129,7 +1129,7 @@ function drawAttract(){
   const pulse=Math.sin(t)*0.3+0.7;
 
   // Layout: compact to ensure everything fits on one screen
-  const titleH=50;       // space for title at top (no subtitle)
+  const titleH=62;       // space for title at top (no subtitle)
   const scoreH=75;       // space for score table below field
   const promptH=35;      // space for start prompt at bottom
   const availH=H-titleH-scoreH-promptH;  // remaining for field
@@ -1149,11 +1149,11 @@ function drawAttract(){
   ctx.strokeStyle='#ff2200';ctx.lineWidth=4;
   ctx.font='bold 52px monospace';
   const title='CENTIPEDE',tw=ctx.measureText(title).width;
-  ctx.strokeText(title,W/2,titleH-6);
+  ctx.strokeText(title,W/2,titleH-16);
 
   // Inner glow layer (bright red, tighter)
   ctx.shadowBlur=15*pulse;ctx.lineWidth=2.5;
-  ctx.strokeText(title,W/2,titleH-6);
+  ctx.strokeText(title,W/2,titleH-16);
 
   // Fill with gradient
   const titleGrad=ctx.createLinearGradient(W/2-tw/2,titleH-30,W/2+tw/2,titleH-6);
@@ -1161,7 +1161,7 @@ function drawAttract(){
   titleGrad.addColorStop(0.5,'rgba(255,34,0,0.8)');
   titleGrad.addColorStop(1,'rgba(255,80,40,0.6)');
   ctx.fillStyle=titleGrad;
-  ctx.fillText(title,W/2,titleH-6);
+  ctx.fillText(title,W/2,titleH-16);
 
   // White-hot center line
   ctx.shadowColor='#fff';ctx.shadowBlur=8*pulse;
