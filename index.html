@@ -663,6 +663,10 @@ function drawSaucer(s){
   ctx.fillStyle=domeGrad;
   ctx.beginPath();ctx.ellipse(sx,sy-2,18,8,0,Math.PI,0);ctx.fill();
 
+  // Specular highlight on dome (white reflection spot)
+  ctx.fillStyle='rgba(255,255,255,0.4)';ctx.shadowColor='#fff';ctx.shadowBlur=8;
+  ctx.beginPath();ctx.ellipse(sx-4,sy-6,5,3,-0.3,0,Math.PI*2);ctx.fill();
+
   // Base ring (wider)
   ctx.lineWidth=2;
   ctx.beginPath();ctx.ellipse(sx,sy+2,18,4,0,0,Math.PI*2);ctx.stroke();
@@ -958,7 +962,9 @@ function drawCenti(c){
       ctx.fillStyle='rgba(0,0,0,0.25)';ctx.shadowBlur=0;
       ctx.beginPath();ctx.arc(sx+1,sy+seg.h/2+1,seg.w*0.35,0,Math.PI*2);ctx.fill();
 
-      ctx.shadowColor=segColor;ctx.shadowBlur=6;
+      // Pulsing body glow (authentic: segments glow brighter as centipede moves)
+      const bodyGlowPulse=Math.sin(performance.now()/200+i*0.5)*0.3+0.7;
+      ctx.shadowColor=segColor;ctx.shadowBlur=6*bodyGlowPulse;
       ctx.strokeStyle=segColor;ctx.lineWidth=2;
 
       // Segment body - rectangular shape (original was bitmap, wider than tall)
@@ -1615,6 +1621,18 @@ function drawAttract(){
       ctx.beginPath();ctx.arc(explX+Math.cos(angle)*dist,explY+Math.sin(angle)*dist,2.5,0,Math.PI*2);ctx.fill();
     }
     ctx.shadowBlur=0;
+  }
+
+  // Demo score popup "+200" near explosion (fading)
+  const scoreFade=Math.sin(t*10);
+  if(scoreFade>0.3){
+    ctx.textAlign='center';
+    const scoreAlpha=(scoreFade-0.3)/0.7;
+    ctx.fillStyle=`rgba(255,255,68,${scoreAlpha})`;
+    ctx.font='bold 14px monospace';ctx.shadowColor='#ff4';ctx.shadowBlur=8;
+    const scoreY=crawlY-25+(t*10)%20; // rising text
+    ctx.fillText('+200',crawlX,scoreY);
+    ctx.shadowBlur=0;ctx.textAlign='start';
   }
 
   // Demo bullet (firing upward toward centipede)
