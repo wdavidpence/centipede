@@ -476,13 +476,18 @@ function drawScorpion(s){
   const t=performance.now()/150;
 
   if(s.state==='cocoon'){
-    // Cocoon: pulsating centipede head remnant
+    // Cocoon: pulsating centipede head remnant with growing glow
     const pulse=Math.sin(t*3)*4;
-    ctx.shadowColor='#ff4400';ctx.shadowBlur=10+pulse;
-    ctx.strokeStyle='#ff4400';ctx.lineWidth=2;
-    ctx.beginPath();ctx.arc(sx,sy,6+pulse/2,0,Math.PI*2);ctx.stroke();
-    ctx.fillStyle='rgba(255,68,0,0.3)';
+    const growScale=s.emergeScale||1;
+    ctx.shadowColor='#ff4400';ctx.shadowBlur=10+pulse*growScale;
+    ctx.strokeStyle='#ff4400';ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.arc(sx,sy,(6+pulse/2)*growScale,0,Math.PI*2);ctx.stroke();
+    ctx.fillStyle=`rgba(255,68,0,${0.3*growScale})`;
     ctx.fill();
+    // Inner glow ring
+    ctx.shadowColor='#ff8800';ctx.shadowBlur=6;
+    ctx.strokeStyle='rgba(255,136,0,0.5)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.arc(sx,sy,(4+pulse/3)*growScale,0,Math.PI*2);ctx.stroke();
     ctx.shadowBlur=0;
     return;
   }
@@ -748,12 +753,23 @@ function drawSpider(s){
   const sx=s.x, sy=s.y;
 
   if(s.state==='falling'){
-    // Falling: compressed spider shape with legs tucked
-    ctx.shadowColor='#ff00aa';ctx.shadowBlur=10;
+    // Falling: spinning spider (authentic tumbling effect)
+    ctx.save();
+    ctx.translate(sx,sy);
+    ctx.rotate(s.animPhase||0); // spin animation
+    ctx.shadowColor='#ff00aa';ctx.shadowBlur=12;
     ctx.strokeStyle='#ff00aa';ctx.lineWidth=2;
-    ctx.beginPath();ctx.ellipse(sx,sy,5,3,0,0,Math.PI*2);ctx.stroke();
+    // Spinning body
+    ctx.beginPath();ctx.ellipse(0,0,6,4,0,0,Math.PI*2);ctx.stroke();
     ctx.fillStyle='rgba(255,0,170,0.35)';ctx.fill();
+    // Spinning legs (all visible during tumble)
+    ctx.lineWidth=1.5;ctx.shadowBlur=6;
+    for(let i=0;i<4;i++){
+      ctx.beginPath();ctx.moveTo(-5,-i*2);ctx.lineTo(-10,-i*2-2);ctx.lineTo(-13,-i*2+2);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(5,-i*2);ctx.lineTo(10,-i*2-2);ctx.lineTo(13,-i*2+2);ctx.stroke();
+    }
     ctx.shadowBlur=0;
+    ctx.restore();
     return;
   }
 
@@ -1545,6 +1561,28 @@ function drawAttract(){
     ctx.beginPath();ctx.moveTo(spidX-5,ly);ctx.lineTo(spidX-10-spidLP,ly-1);ctx.lineTo(spidX-13-spidLP*1.5,ly+3);ctx.stroke();
     ctx.beginPath();ctx.moveTo(spidX+5,ly);ctx.lineTo(spidX+10+spidLP,ly-1);ctx.lineTo(spidX+13+spidLP*1.5,ly+3);ctx.stroke();
   }
+  ctx.shadowBlur=0;  // Demo bullet (firing upward toward centipede)
+  const bulletY=crawlY-30+Math.sin(t*8)*10;
+  ctx.shadowColor='#fff';ctx.shadowBlur=14;
+  ctx.strokeStyle='#fff';ctx.lineWidth=3.5;
+  ctx.beginPath();ctx.moveTo(crawlX-60,bulletY+14);ctx.lineTo(crawlX-60,bulletY-6);ctx.stroke();
+  ctx.shadowBlur=8;
+  ctx.strokeStyle='rgba(255,200,50,0.6)';ctx.lineWidth=5;
+  ctx.beginPath();ctx.moveTo(crawlX-60,bulletY+8);ctx.lineTo(crawlX-60,bulletY-2);ctx.stroke();
+  ctx.fillStyle='#fff';ctx.shadowBlur=10;
+  ctx.beginPath();ctx.arc(crawlX-60,bulletY-6,2.5,0,Math.PI*2);ctx.fill();
+  ctx.shadowBlur=0;
+
+  // Demo player gunner (bottom center)
+  const gunX=crawlX-60,gunY=FIELD_H-40;
+  ctx.shadowColor='#2288ff';ctx.shadowBlur=8;
+  ctx.strokeStyle='#2288ff';ctx.lineWidth=2;
+  ctx.beginPath();ctx.rect(gunX-4,gunY-2,8,10);ctx.stroke();
+  ctx.beginPath();ctx.arc(gunX,gunY-5,4,0,Math.PI*2);ctx.stroke();
+  ctx.strokeStyle='#44aaff';ctx.lineWidth=2.5;
+  ctx.beginPath();ctx.moveTo(gunX,gunY-9);ctx.lineTo(gunX,gunY-18);ctx.stroke();
+  ctx.fillStyle='#88ccff';ctx.shadowBlur=6;
+  ctx.beginPath();ctx.arc(gunX,gunY-18,2,0,Math.PI*2);ctx.fill();
   ctx.shadowBlur=0;
   ctx.restore();
 
