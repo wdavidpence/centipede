@@ -1306,7 +1306,7 @@ function checkCollisions(){
 // === Wave management ===
 function checkWaveClear(){
   if(centipedes.length===0&&scorpions.length===0&&spiders.length===0&&waveClearMsg===''&&nextWaveDelay===0&&!gameOver){
-    waveClearMsg='WAVE CLEAR!';waveClearFrames=120;playSound('waveclear');
+    waveClearMsg='WAVE CLEARED!';waveClearFrames=120;playSound('waveclear');
     // Bonus points for remaining mushrooms
     const mushBonus=mushrooms.length*10;
     if(mushBonus>0){score+=mushBonus;addFloatText(FIELD_W/2,FIELD_H/2,['MUSH BONUS','+'+mushBonus],'#4f4');}
