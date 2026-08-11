@@ -47,7 +47,7 @@ const GRID_COLS=30;
 const GRID_ROWS=28;
 
 // Fire rate config
-const FIRE_COOLDOWN=8;
+const FIRE_COOLDOWN=6;
 let fireTimer=0;
 
 // Field offset (where the play area starts on screen)
@@ -347,7 +347,7 @@ function updateScorpion(s){
     s.timer--;
     if(s.timer<=0){
       s.state='emerging';
-      s.timer=15; // brief emergence animation
+      s.timer=10; // brief emergence animation
     }
     return;
   }
@@ -513,7 +513,7 @@ function drawScorpion(s){
 // In the original, they appear from wave 3+.
 
 let saucerTimer=0;
-const SAUCER_INTERVAL=480; // spawn saucer every 8 seconds (at wave 3+)
+const SAUCER_INTERVAL=540; // spawn saucer every 9 seconds (at wave 3+)
 
 function spawnSaucer(){
   const fromLeft=Math.random()>0.5;
@@ -556,7 +556,7 @@ function updateSaucer(s){
   s.shootTimer--;
   if(s.shootTimer<=0){
     // Fire a bullet downward toward player
-    saucerBullets.push({x:s.x, y:s.y+10, dy:3.5, life:200});
+    saucerBullets.push({x:s.x, y:s.y+10, dy:3, life:250});
     s.shootTimer=50+Math.random()*70;
   }
 
@@ -958,7 +958,7 @@ function drawFieldBorder(){
 // === HUD with arcade styling ===
 function drawHUD(){
   ctx.fillStyle='#fff';ctx.font='bold 14px monospace';ctx.shadowColor='#fff';ctx.shadowBlur=4;
-  ctx.fillText('SCORE '+score,12,OY-8);
+  ctx.fillText('SCORE '+score,10,OY-8);
   ctx.shadowBlur=0;
 
   // Lives as small player heads (matching in-game sprite)
@@ -972,8 +972,8 @@ function drawHUD(){
     ctx.shadowBlur=0;
   }
 
-  ctx.fillStyle='#4f4';ctx.font='bold 12px monospace';ctx.shadowColor='#4f4';ctx.shadowBlur=4;
-  ctx.fillText('WAVE '+wave,W-70,OY-8);ctx.shadowBlur=0;
+  ctx.fillStyle='#4f4';ctx.font='bold 14px monospace';ctx.shadowColor='#4f4';ctx.shadowBlur=5;
+  ctx.fillText('WAVE '+wave,W-75,OY-8);ctx.shadowBlur=0;
 
   // Display actual high score
   ctx.fillStyle='#ff0';ctx.font='bold 10px monospace';ctx.shadowColor='#ff0';ctx.shadowBlur=3;
@@ -1140,7 +1140,7 @@ function drawGameOver(){
 
   // BUG FIX #17: Show high score on game over only if strictly greater
   if(score>highScore&&score>0){
-    ctx.fillStyle='#ff0';ctx.font='bold 18px monospace';ctx.shadowColor='#ff0';ctx.shadowBlur=8;
+    ctx.fillStyle='#ff0';ctx.font='bold 20px monospace';ctx.shadowColor='#ff0';ctx.shadowBlur=10;
     const nh='NEW HIGH SCORE!',nhw=ctx.measureText(nh).width;
     ctx.fillText(nh,W/2-nhw/2,H/2+65);
   }
@@ -1297,7 +1297,9 @@ function checkCollisions(){
     }
     if(hit){
       lives--;addParticles(ship.x,ship.y,'#2a6aaa',12);playSound('hurt');
-      invincibleTimer=120;
+      // Screen flash on hit (brief white overlay)
+      ctx.fillStyle='rgba(255,255,255,0.3)';ctx.fillRect(0,0,W,H);
+      invincibleTimer=180;
       if(lives<=0){gameOver=true;}
       else ship={x:FIELD_W/2,y:FIELD_H-30};
     }
@@ -1384,7 +1386,7 @@ function loop(){
   if(keys.fire){
     if(fireTimer<=0){
       // Original Centipede: only ONE bullet on screen at a time
-      if(bullets.length<1){bullets.push({x:ship.x,y:ship.y-14,dy:-8});fireTimer=FIRE_COOLDOWN;playSound('shoot');}
+      if(bullets.length<1){bullets.push({x:ship.x,y:ship.y-14,dy:-9});fireTimer=FIRE_COOLDOWN;playSound('shoot');}
     }
   }
   if(fireTimer>0)fireTimer--;
