@@ -1050,20 +1050,50 @@ function drawHUD(){
 // === Attract/start screen ===
 function drawAttract(){
   ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
-  ctx.save();ctx.translate(OX,OY);ctx.scale(SCALE,SCALE);
-  drawBackground();drawFieldBorder();
 
-  // Animated centipede crawling across title screen
   const t=performance.now()/300;
   const pulse=Math.sin(t)*0.3+0.7;
 
-  // Crawling demo centipede on screen (field-relative)
+  // Layout: title at top, field in middle, scores below, prompt at bottom
+  const titleH=60;       // space for title+subtitle at top
+  const scoreH=120;      // space for score table + high score below field
+  const promptH=40;      // space for start prompt at bottom
+  const availH=H-titleH-scoreH-promptH;  // remaining for field
+  const availW=W-40;
+
+  // Scale field to fit the available space
+  const attractScale=Math.min(availW/FIELD_W, availH/FIELD_H, 3);
+  const attractOX=(W-FIELD_W*attractScale)/2;
+  const fieldTop=titleH;
+
+  // Title (screen coords)
+  ctx.shadowColor='#ff2200';ctx.shadowBlur=20*pulse;
+  ctx.strokeStyle='#ff2200';ctx.lineWidth=3;
+  ctx.font='bold 36px monospace';
+  const title='CENTIPEDE',tw=ctx.measureText(title).width;
+  ctx.strokeText(title,W/2-tw/2,titleH-10);
+  ctx.shadowBlur=10*pulse;
+  ctx.fillStyle='rgba(255,34,0,0.3)';
+  ctx.fillText(title,W/2-tw/2,titleH-10);
+
+  // Subtitle
+  ctx.shadowBlur=5;ctx.strokeStyle='#8f8';ctx.lineWidth=1.5;
+  ctx.font='bold 12px monospace';
+  const sub='ATARI ARCADE',sw=ctx.measureText(sub).width;
+  ctx.strokeText(sub,W/2-sw/2,titleH+15);
+  ctx.fillStyle='rgba(136,255,136,0.3)';
+  ctx.fillText(sub,W/2-sw/2,titleH+15);
+
+  // Field with crawling demo centipede
+  ctx.save();ctx.translate(attractOX,fieldTop);ctx.scale(attractScale,attractScale);
+  drawBackground();drawFieldBorder();
+
+  // Crawling demo centipede (field-relative)
   const crawlY=FIELD_H*0.35;
   const crawlX=(t*30)%((FIELD_W+60))-30;
-  const crawlSegs=12;
-  for(let i=0;i<crawlSegs;i++){
+  for(let i=0;i<12;i++){
     const sx=crawlX-i*12, sy=crawlY+Math.sin(t*4+i*0.5)*3;
-    const p=i/crawlSegs;
+    const p=i/12;
     const r=Math.round(255*(1-p)), g=Math.round(100+155*p);
     const col=`rgb(${r},${g},20)`;
     ctx.shadowColor=col;ctx.shadowBlur=8-i*0.5;
@@ -1073,50 +1103,31 @@ function drawAttract(){
   ctx.shadowBlur=0;
   ctx.restore();
 
-  // Title with glow - vector style (screen-relative)
-  ctx.shadowColor='#ff2200';ctx.shadowBlur=20*pulse;
-  ctx.strokeStyle='#ff2200';ctx.lineWidth=3;
-  ctx.font='bold 36px monospace';
-  const title='CENTIPEDE',tw=ctx.measureText(title).width;
-  ctx.strokeText(title,W/2-tw/2,H*0.15);
-
-  // Inner fill
-  ctx.shadowBlur=10*pulse;
-  ctx.fillStyle='rgba(255,34,0,0.3)';
-  ctx.fillText(title,W/2-tw/2,H*0.15);
-
-  // Subtitle
-  ctx.shadowBlur=5;ctx.strokeStyle='#8f8';ctx.lineWidth=1.5;
-  ctx.font='bold 14px monospace';
-  const sub='ATARI ARCADE',sw=ctx.measureText(sub).width;
-  ctx.strokeText(sub,W/2-sw/2,H*0.15+35);
-  ctx.fillStyle='rgba(136,255,136,0.3)';
-  ctx.fillText(sub,W/2-sw/2,H*0.15+35);
-
-  // Score table (arcade authentic)
-  ctx.shadowBlur=0;ctx.fillStyle='#aaa';ctx.font='11px monospace';
+  // Score table below field
+  const scoreStartY=fieldTop+FIELD_H*attractScale+15;
+  ctx.fillStyle='#aaa';ctx.font='11px monospace';
   const scores=[['CENTIPEDE SEGMENT','10'],['CENTIPEDE HEAD','50'],['SCORPION','100'],['SPIDER','75'],['FLYING SAUCER','250']];
   scores.forEach((s,i)=>{
-    ctx.fillStyle='#888';ctx.fillText(s[0],W/2-140,H*0.6+i*18);
-    ctx.fillStyle='#ff4';ctx.fillText(s[1],W/2+120,H*0.6+i*18);
+    ctx.fillStyle='#888';ctx.fillText(s[0],W/2-140,scoreStartY+i*16);
+    ctx.fillStyle='#ff4';ctx.fillText(s[1],W/2+120,scoreStartY+i*16);
   });
 
   // High score
   if(highScore>0){
-    ctx.fillStyle='#ff0';ctx.font='bold 14px monospace';ctx.shadowColor='#ff0';ctx.shadowBlur=6;
+    ctx.fillStyle='#ff0';ctx.font='bold 12px monospace';ctx.shadowColor='#ff0';ctx.shadowBlur=6;
     const hs='HIGH SCORE: '+highScore,hsw=ctx.measureText(hs).width;
-    ctx.fillText(hs,W/2-hsw/2,H*0.82);ctx.shadowBlur=0;
+    ctx.fillText(hs,W/2-hsw/2,scoreStartY+scores.length*16+15);ctx.shadowBlur=0;
   }
 
-  // Blinking start prompt
+  // Blinking start prompt at bottom
   const blink=Math.sin(performance.now()/250)>0;
   if(blink){
     ctx.shadowColor='#ff4';ctx.shadowBlur=10;
     ctx.strokeStyle='#ff4';ctx.lineWidth=2;ctx.font='bold 16px monospace';
     const start='PRESS SPACE OR TAP',startw=ctx.measureText(start).width;
-    ctx.strokeText(start,W/2-startw/2,H*0.92);
+    ctx.strokeText(start,W/2-startw/2,H-15);
     ctx.fillStyle='rgba(255,255,68,0.3)';
-    ctx.fillText(start,W/2-startw/2,H*0.92);
+    ctx.fillText(start,W/2-startw/2,H-15);
   }
   ctx.shadowBlur=0;
 }
