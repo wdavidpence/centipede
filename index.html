@@ -933,17 +933,8 @@ function drawFloatText(){
 
 // === Background grid pattern (arcade authentic vector style) ===
 function drawBackground(){
-  // Pure black background
-  ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
-
-  // Subtle vector-style grid
-  ctx.strokeStyle='rgba(0,255,68,0.07)';ctx.lineWidth=1;
-  for(let x=0;x<FIELD_W;x+=20){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,FIELD_H);ctx.stroke();}
-  for(let y=0;y<FIELD_H;y+=20){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(FIELD_W,y);ctx.stroke();}
-
-  // Intersection dots (vector display aesthetic)
-  ctx.fillStyle='rgba(0,255,68,0.1)';
-  for(let x=0;x<FIELD_W;x+=20){for(let y=0;y<FIELD_H;y+=20){ctx.beginPath();ctx.arc(x,y,1,0,Math.PI*2);ctx.fill();}}
+  // Pure black background (original had no visible grid)
+  ctx.fillStyle='#000';ctx.fillRect(0,0,FIELD_W,FIELD_H);
 }
 
 // === Bullet drawing with glow effect (field-relative) ===
