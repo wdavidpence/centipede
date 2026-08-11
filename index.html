@@ -263,9 +263,9 @@ function updateCenti(c){
   // Move head horizontally
   head.x+=c.dirX*c.speed;
 
-  // Slow downward progression (original: 1px every 8 frames for subtle descent)
+  // Slow downward progression (original: 2px every 8 frames for more dramatic descent)
   c.mushCooldown++;
-  if(c.mushCooldown%8===0){head.y+=1;}
+  if(c.mushCooldown%8===0){head.y+=2;}
 
   // Mushroom collision - turn and drop down (head only)
   for(let i=0;i<mushrooms.length;i++){
