@@ -938,10 +938,18 @@ function drawCenti(c){
       ctx.beginPath();ctx.arc(frontX+dir*5, sy-seg.h/2-6+antWave,1.5,0,Math.PI*2);ctx.fill();
       ctx.beginPath();ctx.arc(frontX+dir*4, sy-seg.h/2-4-antWave,1.5,0,Math.PI*2);ctx.fill();
 
-      // Eyes (white dots on front of head)
-      ctx.fillStyle='#fff';ctx.shadowBlur=4;
-      ctx.beginPath();ctx.arc(frontX-1, sy-seg.h/2+1, 1.8,0,Math.PI*2);ctx.fill();
-      ctx.beginPath();ctx.arc(frontX+1, sy-seg.h/2+3, 1.8,0,Math.PI*2);ctx.fill();
+      // Eyes (white dots on front of head, with periodic blink)
+      const eyeBlink=Math.sin(performance.now()/2000)>-0.95; // blink every ~3.5s
+      if(eyeBlink){
+        ctx.fillStyle='#fff';ctx.shadowBlur=4;
+        ctx.beginPath();ctx.arc(frontX-1, sy-seg.h/2+1, 1.8,0,Math.PI*2);ctx.fill();
+        ctx.beginPath();ctx.arc(frontX+1, sy-seg.h/2+3, 1.8,0,Math.PI*2);ctx.fill();
+      }else{
+        // Blink: eyes become thin lines
+        ctx.strokeStyle='#fff';ctx.lineWidth=1;ctx.shadowBlur=2;
+        ctx.beginPath();ctx.moveTo(frontX-2.5,sy-seg.h/2+1);ctx.lineTo(frontX+0.5,sy-seg.h/2+1);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(frontX-0.5,sy-seg.h/2+3);ctx.lineTo(frontX+2.5,sy-seg.h/2+3);ctx.stroke();
+      }
 
       // Mandibles (small jaw lines below eyes)
       ctx.strokeStyle=segColor;ctx.lineWidth=1.5;ctx.shadowBlur=3;
@@ -1518,7 +1526,9 @@ function drawHUD(){
   ctx.fillText('WAVE '+wave,W-90,OY-6);ctx.shadowBlur=0;
 
   // High score (below wave)
-  ctx.fillStyle='#ff0';ctx.font='bold 12px monospace';ctx.shadowColor='#ff0';ctx.shadowBlur=4;
+  // HI score with pulsing glow
+  const hiPulse=Math.sin(performance.now()/500)*2+4;
+  ctx.fillStyle='#ff0';ctx.font='bold 12px monospace';ctx.shadowColor='#ff0';ctx.shadowBlur=hiPulse;
   ctx.fillText('HI '+highScore,W-95,OY+10);ctx.shadowBlur=0;
 }
 
