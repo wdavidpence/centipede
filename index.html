@@ -1166,8 +1166,8 @@ function checkCollisions(){
         if(m.hp<=0){
           addParticles(m.x,m.y,'#3a8030',6);
           mushrooms.splice(mi,1);
-          // BUG FIX #12: Award points for destroying mushrooms
-          score+=5;addFloatText(m.x,m.y,'+5','#4f4');
+          // BUG FIX #12: Award points for destroying mushrooms (original: +1 per shot)
+          score+=1;addFloatText(m.x,m.y,'+1','#4f4');
         }else{m.w*=0.8;m.h*=0.8;}
       }
     }
