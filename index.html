@@ -828,7 +828,7 @@ function drawMush(m){
   const sx=m.x, sy=m.y;
   const sc=getSC();
 
-  // Vector-style mushroom with glow
+  // Vector-style mushroom (original had bitmap sprites with detailed stems/caps)
   ctx.shadowColor=sc.mush;ctx.shadowBlur=8;
 
   // Stem (vector lines)
@@ -836,7 +836,7 @@ function drawMush(m){
   ctx.beginPath();ctx.moveTo(sx-2,sy+2);ctx.lineTo(sx-2,sy+m.h/2);ctx.stroke();
   ctx.beginPath();ctx.moveTo(sx+2,sy+2);ctx.lineTo(sx+2,sy+m.h/2);ctx.stroke();
 
-  // Cap outline (vector arc)
+  // Cap outline (vector arc) - original had rounded mushroom caps
   ctx.strokeStyle=sc.mush;ctx.lineWidth=2;
   ctx.shadowBlur=10;
   ctx.beginPath();ctx.arc(sx,sy,m.w/2,Math.PI,0);ctx.stroke();
@@ -846,26 +846,19 @@ function drawMush(m){
   ctx.fillStyle=`rgba(${parseInt(mushRgba.slice(0,2),16)},${parseInt(mushRgba.slice(2,4),16)},${parseInt(mushRgba.slice(4,6),16)},0.2)`;
   ctx.beginPath();ctx.arc(sx,sy,m.w/2,Math.PI,0);ctx.fill();
 
-  // Spots on cap (white dots)
+  // Spots on cap (white dots) - original had detailed white spots
   ctx.shadowBlur=4;
   ctx.fillStyle='#ffffff';
   if(m.spots){
     for(let i=0;i<m.spots.length;i++){
       const sp=m.spots[i];
       ctx.beginPath();
-      ctx.arc(sx+Math.cos(sp.angle)*sp.dist,sy+Math.sin(sp.angle)*sp.dist*0.5-2,2,0,Math.PI*2);
+      ctx.arc(sx+Math.cos(sp.angle)*sp.dist,sy+Math.sin(sp.angle)*sp.dist*0.5-2,1.5,0,Math.PI*2);
       ctx.fill();
     }
   }
 
-  // Damage indicators
-  if(m.hp<4){
-    ctx.fillStyle='#ff4444';
-    for(let i=0;i<4-m.hp;i++){
-      ctx.beginPath();ctx.arc(sx-3+i*3,sy+m.h/2+4,1.5,0,Math.PI*2);ctx.fill();
-    }
-  }
-
+  // Damage indicators (original didn't show damage, mushrooms just shrank)
   ctx.shadowBlur=0;
   ctx.restore();
 }
