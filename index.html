@@ -1006,20 +1006,12 @@ function drawAttract(){
   // Title (screen coords) - big, bold, classic Atari feel
   ctx.shadowColor='#ff2200';ctx.shadowBlur=25*pulse;
   ctx.strokeStyle='#ff2200';ctx.lineWidth=3;
-  ctx.font='bold 36px monospace';
+  ctx.font='bold 42px monospace';
   const title='CENTIPEDE',tw=ctx.measureText(title).width;
-  ctx.strokeText(title,W/2-tw/2,titleH-10);
+  ctx.strokeText(title,W/2-tw/2,titleH-8);
   ctx.shadowBlur=12*pulse;
   ctx.fillStyle='rgba(255,34,0,0.4)';
-  ctx.fillText(title,W/2-tw/2,titleH-10);
-
-  // Subtitle
-  ctx.shadowBlur=5;ctx.strokeStyle='#8f8';ctx.lineWidth=1.5;
-  ctx.font='bold 10px monospace';
-  const sub='ATARI ARCADE',sw=ctx.measureText(sub).width;
-  ctx.strokeText(sub,W/2-sw/2,titleH+8);
-  ctx.fillStyle='rgba(136,255,136,0.3)';
-  ctx.fillText(sub,W/2-sw/2,titleH+8);
+  ctx.fillText(title,W/2-tw/2,titleH-8);
 
   // Field with crawling demo centipede
   ctx.save();ctx.translate(attractOX,fieldTop);ctx.scale(attractScale,attractScale);
