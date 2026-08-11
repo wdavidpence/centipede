@@ -1038,9 +1038,10 @@ function drawCenti(c){
       // === TAIL: Tapered segment with pronounced wag (authentic Atari look) ===
       const tailWag=Math.sin(t*5)*4; // more pronounced wag
       const sc=getSC();
+      const segColor=getSegmentColor(i,c.segs.length);
 
-      ctx.shadowColor=sc.centiHead;ctx.shadowBlur=8;
-      ctx.strokeStyle=sc.centiHead;ctx.lineWidth=2;
+      ctx.shadowColor=segColor;ctx.shadowBlur=8;
+      ctx.strokeStyle=segColor;ctx.lineWidth=2;
 
       // Tapered tail: triangle pointing down, offset by wag
       const tx=sx+tailWag;
@@ -1051,32 +1052,28 @@ function drawCenti(c){
       ctx.closePath();
       ctx.stroke();
 
-      // Inner fill with gradient for depth
-      const tailRgba=sc.centiHead.replace('#','');
-      const tr=parseInt(tailRgba.slice(0,2),16);
-      const tg=parseInt(tailRgba.slice(2,4),16);
-      const tb=parseInt(tailRgba.slice(4,6),16);
+      // Inner fill with gradient color for depth
       const tailGrad=ctx.createLinearGradient(tx,sy-seg.h/2,tx,sy+seg.h/2+4);
-      tailGrad.addColorStop(0,`rgba(${tr},${tg},${tb},0.5)`);
-      tailGrad.addColorStop(1,`rgba(${tr},${tg},${tb},0.15)`);
+      tailGrad.addColorStop(0,segColor);
+      tailGrad.addColorStop(1,'rgba(0,0,0,0.15)');
       ctx.fillStyle=tailGrad;
       ctx.fill();
 
       // Small tail tip dot
-      ctx.fillStyle=sc.centiHead;ctx.shadowBlur=6;
+      ctx.fillStyle=segColor;ctx.shadowBlur=6;
       ctx.beginPath();ctx.arc(tx+tailWag*0.5, sy+seg.h/2+4, 1.5,0,Math.PI*2);ctx.fill();
 
       // Tiny trail particles behind tail tip (authentic: dust trail)
       if(Math.random()>0.7){
         particles.push({x:tx+tailWag*0.5,y:sy+seg.h/2+4,vx:(Math.random()-0.5)*1,vy:Math.random()*1+0.5,
-          life:10+Math.random()*8,color:sc.centiHead,size:1+Math.random()});
+          life:10+Math.random()*8,color:segColor,size:1+Math.random()});
       }
 
       ctx.shadowBlur=0;
     }else{
-      // === BODY SEGMENTS: Rectangular shape with jumpy leg animation ===
+      // === BODY SEGMENTS: Rectangular shape with jumpy leg animation + color gradient ===
       const sc=getSC();
-      const segColor=sc.centiHead;
+      const segColor=getSegmentColor(i,c.segs.length);
 
       // Original: rapid, jumpy leg animation (16fps, not smooth)
       const legPhase=Math.floor(t*8+i*2)%4; // 4 discrete frames
@@ -1091,16 +1088,13 @@ function drawCenti(c){
       ctx.shadowColor=segColor;ctx.shadowBlur=6*bodyGlowPulse;
 
       // Segment body - rectangular shape (original was bitmap, wider than tall)
+      ctx.strokeStyle=segColor;ctx.lineWidth=2;
       ctx.beginPath();
       ctx.rect(sx-seg.w/2-1, sy-seg.h/2, seg.w+2, seg.h);
       ctx.stroke();
 
-      // Inner fill
-      const segRgba=sc.centiHead.replace('#','');
-      // Alternating segment shades for depth (authentic Atari look)
-      const isAlt=(i%2===0);const fillAlpha=isAlt?0.45:0.25;
-      const brightF=isAlt?1.3:1.0;const sr=parseInt(segRgba.slice(0,2),16);const sg=parseInt(segRgba.slice(2,4),16);const sb=parseInt(segRgba.slice(4,6),16);
-      ctx.fillStyle=`rgba(${Math.min(255,sr*brightF)},${Math.min(255,sg*brightF)},${Math.min(255,sb*brightF)},${fillAlpha})`;
+      // Inner fill with gradient color
+      ctx.fillStyle=segColor;
       ctx.fillRect(sx-seg.w/3, sy-seg.h/4, seg.w*0.66, seg.h*0.5);
 
       // Animated legs (jumpy, 4-frame animation)
