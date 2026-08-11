@@ -770,8 +770,9 @@ function drawCenti(c){
       const tailWag=Math.sin(t*4)*2;
       const sc=getSC();
 
-      ctx.shadowColor=sc.centiTail;ctx.shadowBlur=8;
-      ctx.strokeStyle=sc.centiTail;ctx.lineWidth=2;
+      // Tail uses same head color as body (original: entire centipede one color per stage)
+      ctx.shadowColor=sc.centiHead;ctx.shadowBlur=8;
+      ctx.strokeStyle=sc.centiHead;ctx.lineWidth=2;
 
       // Smaller rectangle than body segments, offset by wag
       ctx.beginPath();
@@ -780,7 +781,7 @@ function drawCenti(c){
 
       // Inner fill
       ctx.shadowBlur=4;
-      const tailRgba=sc.centiTail.replace('#','');
+      const tailRgba=sc.centiHead.replace('#','');
       ctx.fillStyle=`rgba(${parseInt(tailRgba.slice(0,2),16)},${parseInt(tailRgba.slice(2,4),16)},${parseInt(tailRgba.slice(4,6),16)},0.4)`;
       ctx.fillRect(sx+tailWag-seg.w/6, sy-seg.h/6, seg.w*0.33, seg.h*0.33);
 
