@@ -1194,8 +1194,6 @@ function checkCollisions(){
             ctx.fillStyle='rgba(255,100,50,0.2)';ctx.fillRect(0,0,W/H*FIELD_W,FIELD_H);
           }else if(sk===0){
             score+=100;addParticles(seg.x,seg.y,'#ff4422',20,6);
-            // Brief screen shake on head hit
-            ctx.save();ctx.translate(Math.random()*4-2,Math.random()*4-2);
             addFloatText(seg.x,seg.y,['HEAD!','+100'],'#f84');
             // Spawn scorpion from destroyed head (wave 2+)
             if(wave>=2)spawnScorpion(seg.x,seg.y);
