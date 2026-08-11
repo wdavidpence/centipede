@@ -281,7 +281,11 @@ function spawnMush(){
           const dist=cellW*0.3+s*1.2;
           spots.push({angle,dist});
         }
-        mushrooms.push({x:c*cellW+cellW/2,y:startY+r*cellH,w:cellW*0.8,h:cellH*0.9,hp:4,spots,centiHitTimer:0});
+        // Mushroom variety: different cap shapes based on grid position
+        const mushType=(seed%3); // 0=round, 1=wide, 2=tall
+        let mw=mushType===1?cellW*0.9:cellW*0.75;
+        let mh=mushType===2?cellH*1.0:cellH*0.85;
+        mushrooms.push({x:c*cellW+cellW/2,y:startY+r*cellH,w:mw,h:mh,hp:4,spots,centiHitTimer:0,mushType});
       }
     }
   }
@@ -856,25 +860,37 @@ function drawCenti(c){
       ctx.beginPath();ctx.arc(frontX+1, sy-seg.h/2+3, 1.8,0,Math.PI*2);ctx.fill();
 
       ctx.shadowBlur=0;
-    }else if(i===c.segs.length-1){
-      // === TAIL: Smaller rectangle with gentle wag (original style) ===
-      const tailWag=Math.sin(t*5)*3; // more pronounced wag
+        }else if(i===c.segs.length-1){
+      // === TAIL: Tapered segment with pronounced wag (authentic Atari look) ===
+      const tailWag=Math.sin(t*5)*4; // more pronounced wag
       const sc=getSC();
 
-      // Tail uses same head color as body (original: entire centipede one color per stage)
       ctx.shadowColor=sc.centiHead;ctx.shadowBlur=8;
       ctx.strokeStyle=sc.centiHead;ctx.lineWidth=2;
 
-      // Smaller rectangle than body segments, offset by wag
+      // Tapered tail: triangle pointing down, offset by wag
+      const tx=sx+tailWag;
       ctx.beginPath();
-      ctx.rect(sx+tailWag-seg.w/2.5, sy-seg.h/2.5, seg.w*0.8, seg.h*0.8);
+      ctx.moveTo(tx-3, sy-seg.h/2);
+      ctx.lineTo(tx+3, sy-seg.h/2);
+      ctx.lineTo(tx+tailWag*0.5, sy+seg.h/2+4); // tapered point
+      ctx.closePath();
       ctx.stroke();
 
-      // Inner fill
-      ctx.shadowBlur=4;
+      // Inner fill with gradient for depth
       const tailRgba=sc.centiHead.replace('#','');
-      ctx.fillStyle=`rgba(${parseInt(tailRgba.slice(0,2),16)},${parseInt(tailRgba.slice(2,4),16)},${parseInt(tailRgba.slice(4,6),16)},0.4)`;
-      ctx.fillRect(sx+tailWag-seg.w/6, sy-seg.h/6, seg.w*0.33, seg.h*0.33);
+      const tr=parseInt(tailRgba.slice(0,2),16);
+      const tg=parseInt(tailRgba.slice(2,4),16);
+      const tb=parseInt(tailRgba.slice(4,6),16);
+      const tailGrad=ctx.createLinearGradient(tx,sy-seg.h/2,tx,sy+seg.h/2+4);
+      tailGrad.addColorStop(0,`rgba(${tr},${tg},${tb},0.5)`);
+      tailGrad.addColorStop(1,`rgba(${tr},${tg},${tb},0.15)`);
+      ctx.fillStyle=tailGrad;
+      ctx.fill();
+
+      // Small tail tip dot
+      ctx.fillStyle=sc.centiHead;ctx.shadowBlur=6;
+      ctx.beginPath();ctx.arc(tx+tailWag*0.5, sy+seg.h/2+4, 1.5,0,Math.PI*2);ctx.fill();
 
       ctx.shadowBlur=0;
     }else{
@@ -1570,6 +1586,13 @@ function drawAttract(){
     ctx.beginPath();ctx.moveTo(cx-3,coinY-4);ctx.lineTo(cx+3,coinY-4);ctx.stroke();
   }
   ctx.shadowBlur=0;
+
+  // Copyright + player text (authentic Atari style)
+  ctx.textAlign='center';
+  ctx.fillStyle='#666';ctx.font='8px monospace';ctx.shadowBlur=0;
+  const copyrightY=scoreStartY+scores.length*14+35;
+  ctx.fillText('COPYRIGHT 1981 ATARI, INC.',W/2,copyrightY);
+  ctx.fillText('1 PLAYER    2 PLAYERS',W/2,copyrightY+10);
 
   // Blinking start prompt at bottom (authentic arcade style)
   const blink=Math.sin(performance.now()/250)>0;
