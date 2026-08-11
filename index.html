@@ -22,7 +22,7 @@ canvas{display:block;width:100%;height:100%}
 const canvas=document.getElementById('game');
 const ctx=canvas.getContext('2d');
 
-let W,H,ship,bullets=[],centipedes=[],mushrooms=[],scorpions=[];
+let W,H,ship,bullets=[],centipedes=[],mushrooms=[],scorpions=[],saucers=[],spiders=[];
 let score=0,lives=3,wave=1,gameOver=false;
 let keys={left:false,right:false,fire:false};
 let particles=[],floatText=[];
@@ -155,9 +155,9 @@ canvas.addEventListener('click',function(e){
 // === Game initialization ===
 function startGame(){
   score=0;lives=3;wave=1;gameOver=false;
-  bullets=[];centipedes=[];mushrooms=[];scorpions=[];particles=[];floatText=[];
+  bullets=[];centipedes=[];mushrooms=[];scorpions=[];saucers=[];spiders=[];particles=[];floatText=[];
   waveClearMsg='';waveClearFrames=0;nextWaveDelay=0;
-  invincibleTimer=0;fireTimer=0;extraLifeScore=0;
+  invincibleTimer=0;fireTimer=0;extraLifeScore=0;saucerTimer=0;
   // Ship position: field-relative (bottom of play area)
   ship={x:FIELD_W/2,y:H-OY-30};
   spawnMush();spawnCenti();
@@ -464,7 +464,204 @@ function drawScorpion(s,ox){
   ctx.shadowBlur=0;
 }
 
-// === Drawing functions (convert field coords to screen) ===
+// === Flying Saucer mechanics ===
+// Saucers appear at the top of the screen, move horizontally, and drop spiders.
+// In the original, they appear from wave 3+.
+
+let saucerTimer=0;
+const SAUCER_INTERVAL=480; // spawn saucer every 8 seconds (at wave 3+)
+
+function spawnSaucer(){
+  const fromLeft=Math.random()>0.5;
+  saucers.push({
+    x: fromLeft?-30:FIELD_W+30,
+    y: 15, // top of field
+    dirX: fromLeft?2.5:-2.5,
+    speed: 2.5+Math.min(wave*0.1,2),
+    dropTimer: 60+Math.random()*120, // when to drop spider
+    animPhase: 0,
+    alive: true
+  });
+}
+
+function updateSaucer(s){
+  s.x+=s.dirX;
+  s.animPhase+=0.1;
+
+  // Drop spider after timer
+  s.dropTimer--;
+  if(s.dropTimer<=0&&spiders.length<3+Math.floor(wave/2)){
+    // Drop spider at saucer position
+    spiders.push({
+      x: s.x,
+      y: s.y+10,
+      w: 10, h: 8,
+      speed: 2+Math.min(wave*0.1,2),
+      state: 'falling', // 'falling','jumping'
+      fallSpeed: 3,
+      jumpTimer: 0,
+      dirX: (Math.random()>0.5?1:-1),
+      animPhase: Math.random()*Math.PI*2,
+      legAnim: 0
+    });
+    s.dropTimer=90+Math.random()*120; // cooldown before next drop
+  }
+
+  // Remove if off screen
+  if(s.x<-50||s.x>FIELD_W+50)s.alive=false;
+}
+
+function drawSaucer(s,ox){
+  const sx=ox+s.x, sy=OY+s.y;
+  const t=s.animPhase;
+
+  // Glow
+  ctx.shadowColor='#ff00ff';ctx.shadowBlur=12;
+
+  // Saucer body (vector-style dome)
+  ctx.strokeStyle='#ff00ff';ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.ellipse(sx,sy,15,6,0,Math.PI,0); // top dome
+  ctx.stroke();
+  ctx.fillStyle='rgba(255,0,255,0.2)';
+  ctx.fill();
+
+  // Base ring
+  ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.ellipse(sx,sy,15,3,0,0,Math.PI*2);ctx.stroke();
+
+  // Center light
+  const lightPulse=Math.sin(t*3)*0.5+0.5;
+  ctx.fillStyle=`rgba(255,255,255,${0.5+lightPulse*0.5})`;ctx.shadowBlur=6;
+  ctx.beginPath();ctx.arc(sx,sy-2,2,0,Math.PI*2);ctx.fill();
+
+  // Edge lights
+  ctx.fillStyle=`rgba(255,100,255,${0.3+lightPulse*0.4})`;
+  ctx.beginPath();ctx.arc(sx-12,sy,1.5,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(sx+12,sy,1.5,0,Math.PI*2);ctx.fill();
+
+  ctx.shadowBlur=0;
+}
+
+// === Spider mechanics ===
+// Spiders are dropped by saucers. They jump toward the player and destroy
+// mushrooms on contact. In the original, they're worth 75 points.
+
+function updateSpider(s){
+  if(s.state==='falling'){
+    s.y+=s.fallSpeed;
+    // When it reaches the field, start jumping
+    if(s.y>30){
+      s.state='jumping';
+      s.jumpTimer=0;
+    }
+    return;
+  }
+
+  // Jumping state - seek player with hopping movement
+  s.animPhase+=0.12;
+  s.legAnim+=0.2;
+
+  if(s.jumpTimer>0){s.jumpTimer--;return;}
+
+  // Move toward player (field-relative)
+  const dx=ship.x-s.x;
+  const dy=ship.y-s.y;
+  const dist=Math.hypot(dx,dy);
+
+  if(dist>8){
+    let moveX=(dx/dist)*s.speed;
+    let moveY=(dy/dist)*s.speed*0.6;
+
+    // Check mushroom collision
+    let blocked=false;
+    for(let i=0;i<mushrooms.length&&!blocked;i++){
+      const m=mushrooms[i];
+      if(Math.hypot(s.x+moveX-m.x,s.y+moveY-m.y)<m.w/2+5){blocked=true;}
+    }
+
+    if(!blocked){
+      s.x+=moveX;
+      s.y+=moveY;
+    }else{
+      s.x-=s.dirX*s.speed;
+      s.dirX*=-1;
+    }
+  }
+
+  // Spider destroys mushrooms on contact
+  for(let mi=mushrooms.length-1;mi>=0;mi--){
+    const m=mushrooms[mi];
+    if(Math.hypot(s.x-m.x,s.y-m.y)<m.w/2+4){
+      m.hp--;
+      if(m.hp<=0){
+        addParticles(m.x,m.y,'#3a8030',4);
+        mushrooms.splice(mi,1);
+      }else{m.w*=0.8;m.h*=0.8;}
+    }
+  }
+
+  // Keep in bounds
+  if(s.x<5){s.x=5;s.dirX=1;}
+  if(s.x>FIELD_W-5){s.x=FIELD_W-5;s.dirX=-1;}
+
+  // Game over if spider reaches bottom
+  const fieldBottom=H-OY-20;
+  if(s.y>fieldBottom){gameOver=true;}
+}
+
+function drawSpider(s,ox){
+  const sx=ox+s.x, sy=OY+s.y;
+
+  if(s.state==='falling'){
+    // Falling: compressed spider shape
+    ctx.shadowColor='#ff00aa';ctx.shadowBlur=8;
+    ctx.strokeStyle='#ff00aa';ctx.lineWidth=2;
+    ctx.beginPath();ctx.ellipse(sx,sy,5,3,0,0,Math.PI*2);ctx.stroke();
+    ctx.fillStyle='rgba(255,0,170,0.3)';ctx.fill();
+    ctx.shadowBlur=0;
+    return;
+  }
+
+  // Full spider - vector style
+  const legSpread=Math.sin(s.legAnim)*3;
+
+  // Body glow
+  ctx.shadowColor='#ff00aa';ctx.shadowBlur=10;
+  ctx.strokeStyle='#ff00aa';ctx.lineWidth=2;
+
+  // Abdomen (rear)
+  ctx.beginPath();ctx.ellipse(sx,sy+2,6,5,0,0,Math.PI*2);ctx.stroke();
+  ctx.fillStyle='rgba(255,0,170,0.25)';ctx.fill();
+
+  // Cephalothorax (front)
+  ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.arc(sx,sy-4,4,0,Math.PI*2);ctx.stroke();
+
+  // Eyes (red glow)
+  ctx.fillStyle='#ff4444';ctx.shadowBlur=6;
+  ctx.beginPath();ctx.arc(sx-2,sy-5,1.5,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(sx+2,sy-5,1.5,0,Math.PI*2);ctx.fill();
+
+  // 4 pairs of legs with walking animation
+  ctx.strokeStyle='#ff00aa';ctx.lineWidth=1;ctx.shadowBlur=4;
+  for(let i=0;i<4;i++){
+    const phase=s.legAnim+i*0.9;
+    const lAngle=Math.sin(phase)*legSpread;
+    // Left legs
+    ctx.beginPath();
+    ctx.moveTo(sx-4,sy-i*2+1);
+    ctx.quadraticCurveTo(sx-9-lAngle,sy-i*2-2,sx-11-lAngle*1.5,sy-i*2+3);
+    ctx.stroke();
+    // Right legs
+    ctx.beginPath();
+    ctx.moveTo(sx+4,sy-i*2+1);
+    ctx.quadraticCurveTo(sx+9+lAngle,sy-i*2-2,sx+11+lAngle*1.5,sy-i*2+3);
+    ctx.stroke();
+  }
+
+  ctx.shadowBlur=0;
+}
 function drawCenti(c,ox){
   const t=performance.now()/200;
 
@@ -986,7 +1183,7 @@ function checkCollisions(){
   // Clean up empty centipedes
   for(let i=centipedes.length-1;i>=0;i--){if(centipedes[i].segs.length===0)centipedes.splice(i,1);}
 
-  // Bullet-scorpion collisions (only when scorpion is moving)
+  // Bullet-scorpion collisions (only when moving)
   for(let bi=bullets.length-1;bi>=0&&!false;bi--){
     const b=bullets[bi];let scorpionHit=false;
     for(let si=scorpions.length-1;si>=0&&!scorpionHit;si--){
@@ -996,6 +1193,34 @@ function checkCollisions(){
         score+=100;addParticles(s.x,s.y,'#ff6600',15);
         addFloatText(s.x,s.y,['SCORPION','+100'],'#fa0');
         scorpions.splice(si,1);playSound('explode');
+      }
+    }
+  }
+
+  // Bullet-saucer collisions
+  for(let bi=bullets.length-1;bi>=0&&!false;bi--){
+    const b=bullets[bi];let saucerHit=false;
+    for(let si=saucers.length-1;si>=0&&!saucerHit;si--){
+      const s=saucers[si];
+      if(Math.hypot(b.x-s.x,b.y-(s.y))<16){
+        bullets.splice(bi,1);saucerHit=true;
+        score+=250;addParticles(s.x,s.y,'#ff00ff',20);
+        addFloatText(s.x,s.y,['SAUCER','+250'],'#f0f');
+        saucers.splice(si,1);playSound('explode');
+      }
+    }
+  }
+
+  // Bullet-spider collisions (only when jumping)
+  for(let bi=bullets.length-1;bi>=0&&!false;bi--){
+    const b=bullets[bi];let spiderHit=false;
+    for(let si=spiders.length-1;si>=0&&!spiderHit;si--){
+      const s=spiders[si];
+      if(s.state==='jumping'&&Math.hypot(b.x-s.x,b.y-s.y)<8){
+        bullets.splice(bi,1);spiderHit=true;
+        score+=75;addParticles(s.x,s.y,'#ff00aa',12);
+        addFloatText(s.x,s.y,['SPIDER','+75'],'#f0a');
+        spiders.splice(si,1);playSound('hit');
       }
     }
   }
@@ -1017,6 +1242,13 @@ function checkCollisions(){
         if(s.state==='moving'&&Math.hypot(ship.x-s.x,ship.y-s.y)<20){hit=true;}
       }
     }
+    // Ship-spider collision
+    if(!hit){
+      for(let si=0;si<spiders.length&&!hit;si++){
+        const s=spiders[si];
+        if(s.state==='jumping'&&Math.hypot(ship.x-s.x,ship.y-s.y)<20){hit=true;}
+      }
+    }
     if(hit){
       lives--;addParticles(ship.x,ship.y,'#2a6aaa',12);playSound('hurt');
       invincibleTimer=120;
@@ -1028,7 +1260,7 @@ function checkCollisions(){
 
 // === Wave management ===
 function checkWaveClear(){
-  if(centipedes.length===0&&waveClearMsg===''&&nextWaveDelay===0&&!gameOver){
+  if(centipedes.length===0&&scorpions.length===0&&spiders.length===0&&waveClearMsg===''&&nextWaveDelay===0&&!gameOver){
     waveClearMsg='WAVE CLEAR!';waveClearFrames=120;playSound('waveclear');
     // Bonus points for remaining mushrooms
     const mushBonus=mushrooms.length*10;
@@ -1080,6 +1312,8 @@ function loop(){
     for(let i=0;i<mushrooms.length;i++)drawMush(mushrooms[i],ox);
     for(let i=0;i<centipedes.length;i++)drawCenti(centipedes[i],ox);
     for(let i=0;i<scorpions.length;i++)drawScorpion(scorpions[i],ox);
+    for(let i=0;i<saucers.length;i++)drawSaucer(saucers[i],ox);
+    for(let i=0;i<spiders.length;i++)drawSpider(spiders[i],ox);
     drawFieldBorder(ox);drawGameOver();
     // Save high score on game over
     if(score>highScore){highScore=score;localStorage.setItem('centipede_highscore',highScore);}
@@ -1107,6 +1341,15 @@ function loop(){
   // Update scorpions
   for(let i=scorpions.length-1;i>=0;i--)updateScorpion(scorpions[i]);
 
+  // Saucer spawning (wave 3+)
+  if(wave>=3){saucerTimer++;if(saucerTimer>=SAUCER_INTERVAL){spawnSaucer();saucerTimer=0;}}
+
+  // Update saucers
+  for(let i=saucers.length-1;i>=0;i--){updateSaucer(saucers[i]);if(!saucers[i].alive)saucers.splice(i,1);}
+
+  // Update spiders
+  for(let i=spiders.length-1;i>=0;i--)updateSpider(spiders[i]);
+
   // Update bullets (field-relative)
   for(let i=bullets.length-1;i>=0;i--){bullets[i].y+=bullets[i].dy;if(bullets[i].y<-10)bullets.splice(i,1);}
 
@@ -1130,6 +1373,8 @@ function loop(){
   for(let i=0;i<mushrooms.length;i++)drawMush(mushrooms[i],ox);
   for(let i=0;i<centipedes.length;i++)drawCenti(centipedes[i],ox);
   for(let i=0;i<scorpions.length;i++)drawScorpion(scorpions[i],ox);
+  for(let i=0;i<spiders.length;i++)drawSpider(spiders[i],ox);
+  for(let i=0;i<saucers.length;i++)drawSaucer(saucers[i],ox);
   for(let i=0;i<bullets.length;i++)drawBullet(bullets[i],ox);
   if(ship)drawShip(ship,ox);
   drawFieldBorder(ox);
