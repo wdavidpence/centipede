@@ -448,8 +448,9 @@ function drawScorpion(s){
     return;
   }
 
-  // Full scorpion - vector style
-  const legAnim=Math.sin(s.animPhase)*3;
+  // Full scorpion - vector style with jumpy legs (matching centipede)
+  const legFrame=Math.floor(performance.now()/80)%4; // 4 discrete frames
+  const legPos = [0, -2, 0, 2][legFrame];
 
   // Body glow
   ctx.shadowColor='#ff6600';ctx.shadowBlur=10;
@@ -461,7 +462,8 @@ function drawScorpion(s){
   ctx.fill();
 
   // Tail (curved upward behind)
-  const tailCurl=Math.sin(s.animPhase*0.7)*4;
+  const tailFrame=Math.floor(performance.now()/120)%4;
+  const tailCurl=[-3,0,3,0][tailFrame];
   ctx.lineWidth=2;
   ctx.beginPath();
   ctx.moveTo(sx,sy+5);
@@ -474,7 +476,8 @@ function drawScorpion(s){
   ctx.beginPath();ctx.arc(sx+tailCurl*1.5,sy+3,2,0,Math.PI*2);ctx.fill();
 
   // Pincers (front)
-  const pincerOpen=Math.sin(s.animPhase*1.3)*2+4;
+  const pincerFrame=Math.floor(performance.now()/100)%4;
+  const pincerOpen=[3,5,3,5][pincerFrame];
   ctx.strokeStyle='#ff6600';ctx.lineWidth=1.5;ctx.shadowBlur=6;
   ctx.beginPath();
   ctx.moveTo(sx-3,sy-4);ctx.lineTo(sx-6-pincerOpen,sy-8);
@@ -486,15 +489,15 @@ function drawScorpion(s){
   ctx.beginPath();ctx.arc(sx-6-pincerOpen,sy-8,1.5,0,Math.PI*2);ctx.fill();
   ctx.beginPath();ctx.arc(sx+6+pincerOpen,sy-8,1.5,0,Math.PI*2);ctx.fill();
 
-  // Animated legs (4 pairs)
+  // Animated legs (4 pairs, jumpy 4-frame)
   ctx.strokeStyle='#ff6600';ctx.lineWidth=1;ctx.shadowBlur=4;
   for(let i=0;i<4;i++){
     const ly=sy-3+i*2.5;
-    const lAnim=Math.sin(s.animPhase+i*0.8)*legAnim;
+    const iLegPos = [0, -2, 0, 2][(legFrame+i)%4];
     // Left legs
-    ctx.beginPath();ctx.moveTo(sx-5,ly);ctx.lineTo(sx-8-lAnim,ly+3);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(sx-5,ly);ctx.lineTo(sx-8-iLegPos,ly+3);ctx.stroke();
     // Right legs
-    ctx.beginPath();ctx.moveTo(sx+5,ly);ctx.lineTo(sx+8+lAnim,ly+3);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(sx+5,ly);ctx.lineTo(sx+8+iLegPos,ly+3);ctx.stroke();
   }
 
   // Eyes
