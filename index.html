@@ -727,23 +727,25 @@ function drawCenti(c){
     const sx=seg.x, sy=seg.y;
 
     if(i===0){
-      // === HEAD: Same shape as body segments, different color scheme ===
+      // === HEAD: Same rectangular shape as body, different color ===
       // In original Centipede, head uses identical sprite shape as body but with
-      // a distinct color. The "head" is visually the same oval segment shape.
+      // a distinct color. The "head" is visually the same rectangular segment shape.
       const dir=c.dirX;
       const sc=getSC();
 
       ctx.shadowColor=sc.centiHead;ctx.shadowBlur=8;
       ctx.strokeStyle=sc.centiHead;ctx.lineWidth=2;
 
-      // Same oval shape as body segments
-      ctx.beginPath();ctx.ellipse(sx,sy,seg.w/2,seg.h/2+1,0,0,Math.PI*2);ctx.stroke();
+      // Same rectangular shape as body segments
+      ctx.beginPath();
+      ctx.rect(sx-seg.w/2-1, sy-seg.h/2, seg.w+2, seg.h);
+      ctx.stroke();
 
-      // Inner fill
+      // Inner fill (slightly more opaque than body to distinguish)
       ctx.shadowBlur=4;
       const headRgba=sc.centiHead.replace('#','');
       ctx.fillStyle=`rgba(${parseInt(headRgba.slice(0,2),16)},${parseInt(headRgba.slice(2,4),16)},${parseInt(headRgba.slice(4,6),16)},0.5)`;
-      ctx.beginPath();ctx.ellipse(sx,sy,seg.w/3,seg.h/4,0,0,Math.PI*2);ctx.fill();
+      ctx.fillRect(sx-seg.w/3, sy-seg.h/4, seg.w*0.66, seg.h*0.5);
 
       // Small antennae (original head had tiny feelers)
       ctx.shadowBlur=3;
