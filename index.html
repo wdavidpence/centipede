@@ -1003,7 +1003,7 @@ function drawAttract(){
   const pulse=Math.sin(t)*0.3+0.7;
 
   // Layout: title at top, field in middle, scores below, prompt at bottom
-  const titleH=60;       // space for title+subtitle at top
+  const titleH=80;       // space for title+subtitle at top (48px font needs room)
   const scoreH=120;      // space for score table + high score below field
   const promptH=40;      // space for start prompt at bottom
   const availH=H-titleH-scoreH-promptH;  // remaining for field
