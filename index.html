@@ -977,12 +977,13 @@ function drawHUD(){
   ctx.fillText('SCORE '+score,12,OY-8);
   ctx.shadowBlur=0;
 
-  // Lives as small player heads (original style)
+  // Lives as small player heads (matching in-game sprite)
   for(let i=0;i<lives;i++){
     const lx=18+i*20, ly=OY+4;
     ctx.shadowColor='#2288ff';ctx.shadowBlur=3;
     ctx.strokeStyle='#2288ff';ctx.lineWidth=1;
-    ctx.beginPath();ctx.ellipse(lx,ly,4,5,0,0,Math.PI*2);ctx.stroke();
+    // Small rectangle matching player head shape
+    ctx.beginPath();ctx.rect(lx-4,ly-5,8,10);ctx.stroke();
     ctx.fillStyle='rgba(34,136,255,0.3)';ctx.fill();
     ctx.shadowBlur=0;
   }
