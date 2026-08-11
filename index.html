@@ -60,6 +60,7 @@ const GRID_ROWS=28;
 // Fire rate config
 const FIRE_COOLDOWN=5;
 let fireTimer=0;
+let muzzleFlash=0;
 
 // Field offset (where the play area starts on screen)
 const OY=30; // top margin for HUD
@@ -1011,6 +1012,15 @@ function drawShip(s){
   ctx.fillStyle='#fff';ctx.shadowBlur=6;
   ctx.beginPath();ctx.arc(sx,sy-18,1.2,0,Math.PI*2);ctx.fill();
 
+  // Muzzle flash when firing
+  if(muzzleFlash>0){
+    ctx.fillStyle=`rgba(255,255,200,${muzzleFlash/8})`;ctx.shadowColor='#fff';ctx.shadowBlur=20;
+    ctx.beginPath();ctx.arc(sx,sy-18,5+muzzleFlash*0.5,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=`rgba(255,255,255,${muzzleFlash/10})`;
+    ctx.beginPath();ctx.arc(sx,sy-18,3,0,Math.PI*2);ctx.fill();
+    ctx.shadowBlur=6;
+  }
+
   ctx.shadowBlur=0;
 }
 
@@ -1167,6 +1177,11 @@ function drawCRTOverlay(){
     ctx.fillStyle=`rgba(0,0,0,${Math.max(0,1-crtTurnOnProgress)})`;
     ctx.fillRect(0,0,W,H);
   }
+
+  // Phosphor afterglow: semi-transparent overlay of previous frame (CRT persistence)
+  ctx.globalAlpha=0.12; // phosphor persistence amount
+  ctx.drawImage(crtOffscreen,0,0);
+  ctx.globalAlpha=1;
 
   // CRT flicker (subtle power hum effect - random brightness variation)
   const flickerAlpha=0.01+Math.random()*0.015;
@@ -1462,6 +1477,26 @@ function drawAttract(){
   const sLightPulse=Math.sin(t*3)*0.5+0.5;
   ctx.fillStyle=`rgba(255,255,255,${0.5+sLightPulse*0.5})`;ctx.shadowBlur=10;
   ctx.beginPath();ctx.arc(saucerX,saucerY-4,2.5,0,Math.PI*2);ctx.fill();
+  ctx.shadowBlur=0;  // Scorpion demo sprite (bottom area of field)
+  const scorpX=(t*25)%((FIELD_W+40))-20;
+  const scorpY=FIELD_H*0.75+Math.sin(t*2)*15;
+  const legFrame=Math.floor(t*5)%4;
+  const lPos=[0,-2,0,2][legFrame];
+  ctx.shadowColor='#ff6600';ctx.shadowBlur=10;
+  ctx.strokeStyle='#ff6600';ctx.lineWidth=2;
+  ctx.beginPath();ctx.ellipse(scorpX,scorpY,7,5,0,0,Math.PI*2);ctx.stroke();
+  ctx.fillStyle='rgba(255,102,0,0.3)';ctx.fill();
+  const tailCurl=Math.sin(t*3)*2;
+  ctx.beginPath();ctx.moveTo(scorpX,scorpY+5);
+  ctx.quadraticCurveTo(scorpX+tailCurl,scorpY+12,scorpX+tailCurl*1.5,scorpY+6);ctx.stroke();
+  ctx.fillStyle='#ffcc00';ctx.shadowBlur=6;
+  ctx.beginPath();ctx.arc(scorpX+tailCurl*1.5,scorpY+6,2,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#ff6600';ctx.lineWidth=1.5;ctx.shadowBlur=4;
+  for(let i=0;i<4;i++){
+    const ly=scorpY-3+i*2.5;
+    ctx.beginPath();ctx.moveTo(scorpX-6,ly);ctx.lineTo(scorpX-9-lPos,ly+3);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(scorpX+6,ly);ctx.lineTo(scorpX+9+lPos,ly+3);ctx.stroke();
+  }
   ctx.shadowBlur=0;
   ctx.restore();
 
@@ -1851,10 +1886,11 @@ function loop(){
   if(keys.fire){
     if(fireTimer<=0){
       // Original Centipede: only ONE bullet on screen at a time
-      if(bullets.length<1){bullets.push({x:ship.x,y:ship.y-16,dy:-10});fireTimer=FIRE_COOLDOWN;playSound('shoot');}
+      if(bullets.length<1){bullets.push({x:ship.x,y:ship.y-16,dy:-10});fireTimer=FIRE_COOLDOWN;playSound('shoot');muzzleFlash=6;}
     }
   }
   if(fireTimer>0)fireTimer--;
+  if(muzzleFlash>0)muzzleFlash--;
 
   // Update centipedes
   for(let i=centipedes.length-1;i>=0;i--)updateCenti(centipedes[i]);
