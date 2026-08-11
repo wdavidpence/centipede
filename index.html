@@ -335,6 +335,7 @@ function updateCenti(c){
       // Organic squirm: slight sinusoidal wave along body (authentic insectile feel)
       const squirm=Math.sin(performance.now()/150+i*0.7)*0.8;
       c.segs[i].y+=squirm*0.3; // subtle vertical wave
+      c.segs[i].x+=Math.cos(performance.now()/180+i*0.5)*0.3; // subtle horizontal sway
     }else{
       // If trail is too short, position behind previous segment
       const prev=c.segs[i-1];
@@ -722,9 +723,10 @@ function drawSaucer(s){
 
   
 
-  // Shadow beneath saucer (authentic: darker spot on playfield)
+  // Shadow beneath saucer (authentic: darker spot on playfield, pulses with hover)
+  const shadowPulse=Math.sin(t*3)*2+2; // shadow size pulses
   ctx.fillStyle='rgba(0,0,0,0.25)';ctx.shadowBlur=0;
-  ctx.beginPath();ctx.ellipse(sx,sy+14,20,4,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(sx,sy+14,20+shadowPulse,4+shadowPulse*0.5,0,0,Math.PI*2);ctx.fill();
 
   // Engine glow underneath dome (subtle blue-white exhaust)
   const enginePulse=Math.sin(t*5)*0.3+0.5;
@@ -1609,6 +1611,13 @@ function drawAttract(){
   // Subtle "DEMO" label (authentic: original had this during attract mode)
   ctx.fillStyle='rgba(255,255,255,0.15)';ctx.font='8px monospace';
   ctx.fillText('DEMO',W/2-10,titleH+15);
+
+  // Coin counter display (authentic: shows coin slots)
+  const coinBlink=Math.sin(performance.now()/400)>0;
+  if(coinBlink){
+    ctx.fillStyle='rgba(255,200,0,0.4)';ctx.font='8px monospace';
+    ctx.fillText('1P 2P',W/2+30,titleH+15);
+  }
 
   // Apply CRT overlay to attract screen too
   if(scanlinePattern){
