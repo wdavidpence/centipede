@@ -971,6 +971,15 @@ function drawCenti(c){
       // Pulsing body glow (authentic: segments glow brighter as centipede moves)
       const bodyGlowPulse=Math.sin(performance.now()/200+i*0.5)*0.3+0.7;
       ctx.shadowColor=segColor;ctx.shadowBlur=6*bodyGlowPulse;
+
+      // Joint line connecting to previous segment (subtle)
+      if(i>1){
+        const prev=c.segs[i-1];
+        ctx.strokeStyle=`rgba(${parseInt(segColor.replace('#','').slice(0,2),16)},${parseInt(segColor.replace('#','').slice(2,4),16)},${parseInt(segColor.replace('#','').slice(4,6),16)},0.4)`;
+        ctx.lineWidth=1;ctx.shadowBlur=0;
+        ctx.beginPath();ctx.moveTo(prev.x,prev.y);ctx.lineTo(sx,sy);ctx.stroke();
+      }
+
       ctx.strokeStyle=segColor;ctx.lineWidth=2;
 
       // Segment body - rectangular shape (original was bitmap, wider than tall)
@@ -1073,6 +1082,14 @@ function drawShip(s){
   ctx.beginPath();ctx.rect(sx-4,sy-2,8,10);ctx.stroke();
   ctx.fillStyle='rgba(34,136,255,0.3)';
   ctx.fillRect(sx-4,sy-2,8,10);
+
+  // Legs/feet (small lines at bottom)
+  ctx.strokeStyle='#2288ff';ctx.lineWidth=1.5;ctx.shadowBlur=3;
+  ctx.beginPath();ctx.moveTo(sx-3,sy+8);ctx.lineTo(sx-4,sy+12);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(sx+3,sy+8);ctx.lineTo(sx+4,sy+12);ctx.stroke();
+  // Feet (small horizontal lines)
+  ctx.beginPath();ctx.moveTo(sx-5,sy+12);ctx.lineTo(sx-3,sy+12);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(sx+3,sy+12);ctx.lineTo(sx+5,sy+12);ctx.stroke();
 
   // Head (circle on top) with idle breathing
   const breathe=Math.sin(performance.now()/400)*0.5; // subtle breathing
