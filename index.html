@@ -1744,6 +1744,18 @@ function drawAttract(){
   }
   ctx.shadowBlur=0;
 
+  // Scrolling "INSERT COIN" marquee text (authentic arcade)
+  const marqueeText='INSERT COIN';
+  ctx.font='bold 10px monospace';
+  const marqueeW=ctx.measureText(marqueeText).width;
+  const marqueeX=W/2-marqueeW/2+Math.sin(performance.now()/800)*3;
+  const marqueeBlink=Math.sin(performance.now()/300)>-0.5;
+  if(marqueeBlink){
+    ctx.fillStyle='rgba(255,200,0,0.6)';ctx.shadowColor='#fc0';ctx.shadowBlur=4;
+    ctx.fillText(marqueeText,marqueeX,coinY-18);
+    ctx.shadowBlur=0;
+  }
+
   // Copyright + player text (authentic Atari style)
   ctx.textAlign='center';
   ctx.fillStyle='#666';ctx.font='8px monospace';ctx.shadowBlur=0;
