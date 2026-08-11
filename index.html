@@ -696,20 +696,20 @@ function drawSpider(s){
   ctx.beginPath();ctx.arc(sx-2,sy-5,1.5,0,Math.PI*2);ctx.fill();
   ctx.beginPath();ctx.arc(sx+2,sy-5,1.5,0,Math.PI*2);ctx.fill();
 
-  // 4 pairs of legs with walking animation
+  // 4 pairs of legs with jumpy walking animation (matching centipede style)
+  const legFrame=Math.floor(performance.now()/80)%4;
   ctx.strokeStyle='#ff00aa';ctx.lineWidth=1;ctx.shadowBlur=4;
   for(let i=0;i<4;i++){
-    const phase=s.legAnim+i*0.9;
-    const lAngle=Math.sin(phase)*legSpread;
+    const lPos = [0, -3, 0, 3][(legFrame+i)%4];
     // Left legs
     ctx.beginPath();
     ctx.moveTo(sx-4,sy-i*2+1);
-    ctx.quadraticCurveTo(sx-9-lAngle,sy-i*2-2,sx-11-lAngle*1.5,sy-i*2+3);
+    ctx.quadraticCurveTo(sx-9-lPos,sy-i*2-2,sx-11-lPos*1.5,sy-i*2+3);
     ctx.stroke();
     // Right legs
     ctx.beginPath();
     ctx.moveTo(sx+4,sy-i*2+1);
-    ctx.quadraticCurveTo(sx+9+lAngle,sy-i*2-2,sx+11+lAngle*1.5,sy-i*2+3);
+    ctx.quadraticCurveTo(sx+9+lPos,sy-i*2-2,sx+11+lPos*1.5,sy-i*2+3);
     ctx.stroke();
   }
 
