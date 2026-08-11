@@ -320,12 +320,15 @@ function updateCenti(c){
   // Wall bounce - reverse and drop down (original dropped more at walls)
   if(head.x<-10||head.x>FIELD_W+10){c.dirX*=-1;head.y+=15;}
 
-  // BUG FIX #13: Body segments follow trail with proper spacing
+  // BUG FIX #13: Body segments follow trail with proper spacing + organic squirm
   for(let i=1;i<c.segs.length;i++){
     const trailIdx=i*2;
     if(trailIdx<c.trail.length){
       c.segs[i].x=c.trail[trailIdx].x;
       c.segs[i].y=c.trail[trailIdx].y;
+      // Organic squirm: slight sinusoidal wave along body (authentic insectile feel)
+      const squirm=Math.sin(performance.now()/150+i*0.7)*0.8;
+      c.segs[i].y+=squirm*0.3; // subtle vertical wave
     }else{
       // If trail is too short, position behind previous segment
       const prev=c.segs[i-1];
@@ -386,15 +389,21 @@ function spawnScorpion(x,y){
 function updateScorpion(s){
   if(s.state==='cocoon'){
     s.timer--;
+    // Cocoon grows slightly as scorpion prepares to emerge
+    if(s.timer<=15){
+      s.emergeScale=1+(15-s.timer)*0.1; // pulse up to 2.5x
+    }
     if(s.timer<=0){
       s.state='emerging';
-      s.timer=10; // brief emergence animation
+      s.timer=15; // brief emergence animation (longer for more drama)
+      s.emergeScale=1;
     }
     return;
   }
 
   if(s.state==='emerging'){
     s.timer--;
+    s.emergeScale=1+(15-s.timer)*0.2; // expand from 1x to 4x during burst
     if(s.timer<=0){
       s.state='moving';
     }
@@ -673,6 +682,8 @@ function drawSaucer(s){
 function updateSpider(s){
   if(s.state==='falling'){
     s.y+=s.fallSpeed;
+    // Spider spins while falling (authentic)
+    s.animPhase+=0.3;
     // When it reaches the field, start jumping
     if(s.y>30){
       s.state='jumping';
@@ -1081,7 +1092,7 @@ function drawBackground(){
   ctx.fillStyle='#000';ctx.fillRect(0,0,FIELD_W,FIELD_H);
 
   // Subtle grid dots at intersections (original Atari had faint playfield markers)
-  ctx.fillStyle='rgba(20,40,20,0.5)';
+  ctx.fillStyle='rgba(15,30,15,0.2)';
   const cellW=FIELD_W/GRID_COLS;
   const cellH=(FIELD_H-60)/GRID_ROWS;
   const startY=35;
