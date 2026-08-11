@@ -1106,36 +1106,38 @@ function drawWaveClear(){
 
 // === Game over screen with arcade styling ===
 function drawGameOver(){
-  ctx.fillStyle='rgba(0,0,0,0.75)';ctx.fillRect(0,0,W,H);
+  // Original: semi-transparent overlay with bold text
+  ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fillRect(0,0,W,H);
 
-  ctx.shadowColor='#ff2200';ctx.shadowBlur=18;
-  ctx.strokeStyle='#ff2200';ctx.lineWidth=3;ctx.font='bold 32px monospace';
+  ctx.shadowColor='#ff2200';ctx.shadowBlur=15;
+  ctx.strokeStyle='#ff2200';ctx.lineWidth=3;ctx.font='bold 36px monospace';
   const goText='GAME OVER',goW=ctx.measureText(goText).width;
-  ctx.strokeText(goText,W/2-goW/2,H/2-40);
-  ctx.fillStyle='rgba(255,34,0,0.3)';
-  ctx.fillText(goText,W/2-goW/2,H/2-40);
+  ctx.strokeText(goText,W/2-goW/2,H/2-50);
+  ctx.shadowBlur=8;
+  ctx.fillStyle='rgba(255,34,0,0.4)';
+  ctx.fillText(goText,W/2-goW/2,H/2-50);
 
-  ctx.shadowColor='#ff0';ctx.shadowBlur=8;
-  ctx.fillStyle='#ff0';ctx.font='bold 16px monospace';
+  ctx.shadowColor='#ff0';ctx.shadowBlur=6;
+  ctx.fillStyle='#ff0';ctx.font='bold 18px monospace';
   const scText='SCORE: '+score,scW=ctx.measureText(scText).width;
   ctx.fillText(scText,W/2-scW/2,H/2);
 
-  ctx.shadowColor='#4f4';ctx.shadowBlur=5;
-  ctx.fillStyle='#4f4';ctx.font='bold 14px monospace';
+  ctx.shadowColor='#4f4';ctx.shadowBlur=4;
+  ctx.fillStyle='#4f4';ctx.font='bold 16px monospace';
   const wvText='WAVE: '+wave,wvW=ctx.measureText(wvText).width;
-  ctx.fillText(wvText,W/2-wvW/2,H/2+30);
+  ctx.fillText(wvText,W/2-wvW/2,H/2+35);
 
   // BUG FIX #17: Show high score on game over only if strictly greater
   if(score>highScore&&score>0){
-    ctx.fillStyle='#ff0';ctx.font='bold 16px monospace';ctx.shadowColor='#ff0';ctx.shadowBlur=8;
+    ctx.fillStyle='#ff0';ctx.font='bold 18px monospace';ctx.shadowColor='#ff0';ctx.shadowBlur=8;
     const nh='NEW HIGH SCORE!',nhw=ctx.measureText(nh).width;
-    ctx.fillText(nh,W/2-nhw/2,H/2+55);
+    ctx.fillText(nh,W/2-nhw/2,H/2+65);
   }
 
   const blink=Math.sin(performance.now()/300)>0;
-  if(blink){ctx.shadowBlur=0;ctx.fillStyle='#888';ctx.font='12px monospace';
+  if(blink){ctx.shadowBlur=0;ctx.fillStyle='#aaa';ctx.font='bold 14px monospace';
     const rt='PRESS SPACE OR TAP',rtW=ctx.measureText(rt).width;
-    ctx.fillText(rt,W/2-rtW/2,H/2+85);}
+    ctx.fillText(rt,W/2-rtW/2,H/2+95);}
   ctx.shadowBlur=0;
 }
 
