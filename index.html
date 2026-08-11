@@ -758,21 +758,23 @@ function drawCenti(c){
 
       ctx.shadowBlur=0;
     }else if(i===c.segs.length-1){
-      // === TAIL: Slightly smaller oval with gentle wag (original style) ===
+      // === TAIL: Smaller rectangle with gentle wag (original style) ===
       const tailWag=Math.sin(t*4)*2;
       const sc=getSC();
 
       ctx.shadowColor=sc.centiTail;ctx.shadowBlur=8;
       ctx.strokeStyle=sc.centiTail;ctx.lineWidth=2;
 
-      // Smaller oval than body segments
-      ctx.beginPath();ctx.ellipse(sx+tailWag,sy,seg.w/3,seg.h/3+1,0,0,Math.PI*2);ctx.stroke();
+      // Smaller rectangle than body segments, offset by wag
+      ctx.beginPath();
+      ctx.rect(sx+tailWag-seg.w/3, sy-seg.h/3, seg.w*0.66, seg.h*0.66);
+      ctx.stroke();
 
       // Inner fill
       ctx.shadowBlur=4;
       const tailRgba=sc.centiTail.replace('#','');
       ctx.fillStyle=`rgba(${parseInt(tailRgba.slice(0,2),16)},${parseInt(tailRgba.slice(2,4),16)},${parseInt(tailRgba.slice(4,6),16)},0.4)`;
-      ctx.beginPath();ctx.arc(sx+tailWag,sy,seg.w/4,0,Math.PI*2);ctx.fill();
+      ctx.fillRect(sx+tailWag-seg.w/6, sy-seg.h/6, seg.w*0.33, seg.h*0.33);
 
       ctx.shadowBlur=0;
     }else{
