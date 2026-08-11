@@ -198,8 +198,9 @@ function spawnCenti(offset){
   const fromLeft=(wave%2===1);
   const dirX=fromLeft?1:-1;
   const startX=fromLeft?-5:FIELD_W+5;
-  // Speed ramp: gentle increase, capped at wave 20
-  const spd=1.0+Math.min(wave,20)*0.08;
+  // Original Centipede: odd waves are fast, even waves are slow
+  const isFastWave = (wave % 2 === 1);
+  const spd = isFastWave ? 1.5 + Math.min(wave,20)*0.06 : 0.7 + Math.min(wave,20)*0.04;
   const segGap=8;
 
   const segs=[];
@@ -773,15 +774,10 @@ function drawCenti(c){
 
       ctx.shadowBlur=0;
     }else{
-      // === BODY SEGMENTS: Vector-style with animated legs (conveyor belt) ===
-      const segProgress=i/c.segs.length; // 0=head end, 1=tail end
-
-      // Color gradient from red (head) to green (tail) - authentic Atari rainbow
-      const r=Math.round(255*(1-segProgress));
-      const g=Math.round(100+155*segProgress);
-      const b=Math.round(20-20*segProgress);
-      const segColor=`rgb(${r},${g},${b})`;
-      const segGlow=`rgba(${r},${g},${b},0.6)`;
+      // === BODY SEGMENTS: Same color scheme as head, animated legs ===
+      const sc=getSC();
+      // Use stage head color for all body segments (original used same color)
+      const segColor=sc.centiHead;
 
       // Animated legs - conveyor belt effect (legs phase shifts along body)
       const legPhase=t*3+i*0.8; // staggered animation creates wave effect
@@ -791,12 +787,12 @@ function drawCenti(c){
       ctx.strokeStyle=segColor;ctx.lineWidth=2;
 
       // Segment body - vector-style oval
-      const bodyPulse=Math.sin(t*2+i*0.5)*0.3;
-      ctx.beginPath();ctx.ellipse(sx,sy,seg.w/2+bodyPulse,seg.h/2+1,0,0,Math.PI*2);ctx.stroke();
+      ctx.beginPath();ctx.ellipse(sx,sy,seg.w/2,seg.h/2+1,0,0,Math.PI*2);ctx.stroke();
 
       // Inner fill
-      ctx.fillStyle=segGlow;
-      ctx.beginPath();ctx.ellipse(sx,sy,seg.w/3,bodyPulse+0.5,0,0,Math.PI*2);ctx.fill();
+      const segRgba=sc.centiHead.replace('#','');
+      ctx.fillStyle=`rgba(${parseInt(segRgba.slice(0,2),16)},${parseInt(segRgba.slice(2,4),16)},${parseInt(segRgba.slice(4,6),16)},0.3)`;
+      ctx.beginPath();ctx.ellipse(sx,sy,seg.w/3,seg.h/4,0,0,Math.PI*2);ctx.fill();
 
       // Animated legs (vector lines below segment)
       ctx.strokeStyle=segColor;ctx.lineWidth=1;
