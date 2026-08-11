@@ -2026,7 +2026,6 @@ function loop(){
 
   // Handle game over state (before gameplay update)
   if(gameOver){
-    crtPowerOffProgress=Math.max(0,crtPowerOffProgress-0.02); // Ensure it resets if we restart
     // Save high score on game over
     if(score>highScore){highScore=score;localStorage.setItem('centipede_highscore',highScore);}
     if(gameState!=='gameover')playSound('gameover');
