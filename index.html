@@ -772,39 +772,39 @@ function drawCenti(c){
 
       ctx.shadowBlur=0;
     }else{
-      // === BODY SEGMENTS: Same color scheme as head, animated legs ===
+      // === BODY SEGMENTS: Rectangular shape with jumpy leg animation ===
       const sc=getSC();
-      // Use stage head color for all body segments (original used same color)
       const segColor=sc.centiHead;
 
-      // Animated legs - conveyor belt effect (legs phase shifts along body)
-      const legPhase=t*3+i*0.8; // staggered animation creates wave effect
-      const legAngle=Math.sin(legPhase)*0.5;
+      // Original: rapid, jumpy leg animation (16fps, not smooth)
+      const legPhase=Math.floor(t*8+i*2)%4; // 4 discrete frames
+      const legPos = [0, -2, 0, 2][legPhase]; // jumpy positions
 
       ctx.shadowColor=segColor;ctx.shadowBlur=6;
       ctx.strokeStyle=segColor;ctx.lineWidth=2;
 
-      // Segment body - vector-style oval
-      ctx.beginPath();ctx.ellipse(sx,sy,seg.w/2,seg.h/2+1,0,0,Math.PI*2);ctx.stroke();
+      // Segment body - rectangular shape (original was bitmap, wider than tall)
+      ctx.beginPath();
+      ctx.rect(sx-seg.w/2-1, sy-seg.h/2, seg.w+2, seg.h);
+      ctx.stroke();
 
       // Inner fill
       const segRgba=sc.centiHead.replace('#','');
       ctx.fillStyle=`rgba(${parseInt(segRgba.slice(0,2),16)},${parseInt(segRgba.slice(2,4),16)},${parseInt(segRgba.slice(4,6),16)},0.3)`;
-      ctx.beginPath();ctx.ellipse(sx,sy,seg.w/3,seg.h/4,0,0,Math.PI*2);ctx.fill();
+      ctx.fillRect(sx-seg.w/3, sy-seg.h/4, seg.w*0.66, seg.h*0.5);
 
-      // Animated legs (vector lines below segment)
-      ctx.strokeStyle=segColor;ctx.lineWidth=1;
-      ctx.shadowBlur=4;
-      const legLen=4;
+      // Animated legs (jumpy, 4-frame animation)
+      ctx.strokeStyle=segColor;ctx.lineWidth=1;ctx.shadowBlur=4;
+      const legLen=3;
       // Left leg
       ctx.beginPath();
-      ctx.moveTo(sx-seg.w/4,sy+seg.h/4);
-      ctx.lineTo(sx-seg.w/3-Math.sin(legAngle)*2,sy+seg.h/4+legLen+Math.cos(legAngle)*2);
+      ctx.moveTo(sx-seg.w/4,sy+seg.h/2);
+      ctx.lineTo(sx-seg.w/3+legPos,sy+seg.h/2+legLen);
       ctx.stroke();
       // Right leg
       ctx.beginPath();
-      ctx.moveTo(sx+seg.w/4,sy+seg.h/4);
-      ctx.lineTo(sx+seg.w/3+Math.sin(legAngle)*2,sy+seg.h/4+legLen-Math.cos(legAngle)*2);
+      ctx.moveTo(sx+seg.w/4,sy+seg.h/2);
+      ctx.lineTo(sx+seg.w/3-legPos,sy+seg.h/2+legLen);
       ctx.stroke();
 
       // Connection line to previous segment (vector-style)
