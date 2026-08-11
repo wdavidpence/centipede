@@ -991,11 +991,10 @@ function drawAttract(){
   const t=performance.now()/300;
   const pulse=Math.sin(t)*0.3+0.7;
 
-  // Layout: title at top, field in middle, scores below, prompt at bottom
-  // Tight layout to ensure everything fits on screen
-  const titleH=55;       // space for title+subtitle at top
-  const scoreH=100;      // space for score table + high score below field
-  const promptH=35;      // space for start prompt at bottom
+  // Layout: compact to ensure everything fits on one screen
+  const titleH=45;       // space for title+subtitle at top
+  const scoreH=80;       // space for score table below field (compact)
+  const promptH=30;      // space for start prompt at bottom
   const availH=H-titleH-scoreH-promptH;  // remaining for field
   const availW=W-40;
 
@@ -1007,7 +1006,7 @@ function drawAttract(){
   // Title (screen coords) - big, bold, classic Atari feel
   ctx.shadowColor='#ff2200';ctx.shadowBlur=25*pulse;
   ctx.strokeStyle='#ff2200';ctx.lineWidth=3;
-  ctx.font='bold 40px monospace';
+  ctx.font='bold 36px monospace';
   const title='CENTIPEDE',tw=ctx.measureText(title).width;
   ctx.strokeText(title,W/2-tw/2,titleH-10);
   ctx.shadowBlur=12*pulse;
