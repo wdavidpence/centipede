@@ -332,7 +332,7 @@ function spawnScorpion(x,y){
   scorpions.push({
     x, y,
     w:10, h:8,
-    speed:2.5 + Math.min(wave*0.15, 3), // speed scales with wave
+    speed:2.0 + Math.min(wave*0.1, 1), // scorpion ~2-3px/frame (matching centipede fast)
     state: 'cocoon', // 'cocoon','emerging','moving'
     timer: 60, // frames before emerging (1 second)
     dirX: (Math.random()>0.5?1:-1),
