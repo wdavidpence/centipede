@@ -900,11 +900,9 @@ function drawShip(s){
   ctx.strokeStyle='#44aaff';ctx.lineWidth=2;
   ctx.beginPath();ctx.moveTo(sx,sy-7);ctx.lineTo(sx,sy-14);ctx.stroke();
 
-  // Gun tip
+  // Gun tip glow
   ctx.fillStyle='#88ccff';
   ctx.beginPath();ctx.arc(sx,sy-14,2,0,Math.PI*2);ctx.fill();
-  ctx.beginPath();ctx.moveTo(sx,sy-10);ctx.lineTo(sx,sy-16);ctx.stroke();
-  ctx.beginPath();ctx.arc(sx,sy-16,1,0,Math.PI*2);ctx.fill();
 
   ctx.shadowBlur=0;
 }
