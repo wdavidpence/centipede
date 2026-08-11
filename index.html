@@ -47,7 +47,7 @@ const GRID_COLS=30;
 const GRID_ROWS=28;
 
 // Fire rate config
-const FIRE_COOLDOWN=6;
+const FIRE_COOLDOWN=5;
 let fireTimer=0;
 
 // Field offset (where the play area starts on screen)
@@ -332,7 +332,7 @@ function spawnScorpion(x,y){
   scorpions.push({
     x, y,
     w:10, h:8,
-    speed:1.8 + Math.min(wave*0.1, 0.8), // scorpion ~1.8-2.6px/frame
+    speed:1.8 + Math.min(wave*0.15, 1.2), // scorpion ~1.8-3px/frame (scales with wave)
     state: 'cocoon', // 'cocoon','emerging','moving'
     timer: 75, // frames before emerging (1.25 seconds)
     dirX: (Math.random()>0.5?1:-1),
@@ -520,7 +520,7 @@ function spawnSaucer(){
   saucers.push({
     x: fromLeft?-30:FIELD_W+30,
     y: 15, // top of field
-    dirX: fromLeft?3:-3,
+    dirX: fromLeft?(3+Math.min(wave*0.2,2)):-3-(Math.min(wave*0.2,2)),
     speed: 2.5+Math.min(wave*0.1,2),
     dropTimer: 60+Math.random()*120, // when to drop spider
     animPhase: 0,
@@ -1140,7 +1140,7 @@ function drawGameOver(){
   ctx.fillText(wvText,W/2-wvW/2,H/2+35);
 
   // BUG FIX #17: Show high score on game over only if strictly greater
-  if(score>highScore&&score>0){
+  if(score>=highScore&&score>0){
     ctx.fillStyle='#ff0';ctx.font='bold 20px monospace';ctx.shadowColor='#ff0';ctx.shadowBlur=10;
     const nh='NEW HIGH SCORE!',nhw=ctx.measureText(nh).width;
     ctx.fillText(nh,W/2-nhw/2,H/2+65);
@@ -1194,6 +1194,8 @@ function checkCollisions(){
             ctx.fillStyle='rgba(255,100,50,0.2)';ctx.fillRect(0,0,W/H*FIELD_W,FIELD_H);
           }else if(sk===0){
             score+=100;addParticles(seg.x,seg.y,'#ff4422',20,6);
+            // Brief screen shake on head hit
+            ctx.save();ctx.translate(Math.random()*4-2,Math.random()*4-2);
             addFloatText(seg.x,seg.y,['HEAD!','+100'],'#f84');
             // Spawn scorpion from destroyed head (wave 2+)
             if(wave>=2)spawnScorpion(seg.x,seg.y);
@@ -1315,7 +1317,7 @@ function checkWaveClear(){
     waveClearMsg='WAVE CLEARED!';waveClearFrames=150;playSound('waveclear');
     // Bonus points for remaining mushrooms
     const mushBonus=mushrooms.length*10;
-    if(mushBonus>0){score+=mushBonus;addFloatText(FIELD_W/2,FIELD_H/2,['MUSH BONUS','+'+mushBonus],'#4f4');}
+    if(mushBonus>0){score+=mushBonus;addFloatText(FIELD_W/2,FIELD_H/2-10,['MUSH BONUS','+'+mushBonus,'#pts'],'#4f4');}
   }
 }
 
@@ -1328,7 +1330,7 @@ function updateWaveTransition(){
 
 function spawnNextWave(){
   wave++;
-  const numCentipedes=Math.min(wave,5);
+  const numCentipedes=Math.min(1+Math.floor((wave-1)/2),5);
   // BUG FIX #14: Stagger multiple centipedes with y offset
   for(let i=0;i<numCentipedes;i++)spawnCenti(i*15);
 }
