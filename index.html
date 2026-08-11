@@ -255,7 +255,7 @@ function updateCenti(c){
   // Move head horizontally
   head.x+=c.dirX*c.speed;
 
-  // Slow downward progression (1px every 8 frames)
+  // Slow downward progression (original: 1px every 8 frames for subtle descent)
   c.mushCooldown++;
   if(c.mushCooldown%8===0){head.y+=1;}
 
@@ -264,12 +264,12 @@ function updateCenti(c){
     const m=mushrooms[i];
     if(head.x+head.w/2>m.x-m.w/2&&head.x-head.w/2<m.x+m.w/2&&
        head.y+head.h/2>m.y-m.h/2&&head.y-head.h/2<m.y+m.h/2){
-      if(c.mushCooldown>15){c.dirX*=-1;head.y+=16;c.mushCooldown=0;break;}
+      if(c.mushCooldown>15){c.dirX*=-1;head.y+=12;c.mushCooldown=0;break;}
     }
   }
 
-  // Wall bounce - reverse and drop down
-  if(head.x<-10||head.x>FIELD_W+10){c.dirX*=-1;head.y+=8;}
+  // Wall bounce - reverse and drop down (original dropped more at walls)
+  if(head.x<-10||head.x>FIELD_W+10){c.dirX*=-1;head.y+=10;}
 
   // BUG FIX #13: Body segments follow trail with proper spacing
   for(let i=1;i<c.segs.length;i++){
