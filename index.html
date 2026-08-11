@@ -1306,9 +1306,10 @@ function drawAttract(){
   ctx.shadowBlur=0;
   drawFieldBorder();
 
-  // Crawling demo centipede (field-relative, rectangular segments)
+  // Crawling demo centipede (field-relative, rectangular segments with antennae)
   const crawlY=FIELD_H*0.3+Math.sin(t*0.5)*FIELD_H*0.1; // vertical wobble
   const crawlX=(t*40)%((FIELD_W+80))-40;
+  const crawlDir=1; // crawling right to left
   const sc=getSC();
   for(let i=0;i<12;i++){
     const sx=crawlX-i*12, sy=crawlY+Math.sin(t*4+i*0.5)*3;
@@ -1323,6 +1324,19 @@ function drawAttract(){
     ctx.fillStyle=`rgba(${parseInt(headRgba.slice(0,2),16)},${parseInt(headRgba.slice(2,4),16)},${parseInt(headRgba.slice(4,6),16)},${0.3*(1-p)})`;
     ctx.fillRect(sx-2,sy-1.5,4,3);
   }
+  // Antennae on head segment (matching in-game centipede)
+  const antWave=Math.sin(t*6)*3;
+  const headSx=crawlX, headSy=crawlY;
+  const frontX=headSx+crawlDir*6;
+  ctx.strokeStyle=sc.centiHead;ctx.lineWidth=1.5;ctx.shadowBlur=8;
+  ctx.beginPath();ctx.moveTo(frontX,headSy-3);
+  ctx.lineTo(frontX+crawlDir*5, headSy-9+antWave);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(frontX,headSy-1);
+  ctx.lineTo(frontX+crawlDir*4, headSy-7-antWave);ctx.stroke();
+  // Antenna tips
+  ctx.fillStyle=sc.centiHead;ctx.shadowBlur=10;
+  ctx.beginPath();ctx.arc(frontX+crawlDir*5, headSy-9+antWave,1.5,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(frontX+crawlDir*4, headSy-7-antWave,1.5,0,Math.PI*2);ctx.fill();
   ctx.shadowBlur=0;
   ctx.restore();
 
