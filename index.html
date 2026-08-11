@@ -210,7 +210,7 @@ function spawnCenti(offset){
   const isFastWave = (wave % 2 === 1);
   // Fast waves: ~2px/frame, slow waves: ~0.75px/frame (authentic pacing)
   const spd = isFastWave ? 2.0 : 0.75;
-  const segGap=8;
+  const segGap=9;
 
   const segs=[];
   for(let i=0;i<segCount;i++){
@@ -218,7 +218,7 @@ function spawnCenti(offset){
     segs.push({x:startX-i*segGap*dirX,y:5+i*2+offset,w:8,h:5});
   }
   const trail=[];
-  for(let i=0;i<segCount*2+10;i++){
+  for(let i=0;i<segCount*3+10;i++){
     trail.push({x:startX-i*spd*dirX,y:5+i*2+offset});
   }
   centipedes.push({segs,dirX,speed:spd,mushCooldown:0,trail});
@@ -265,7 +265,7 @@ function updateCenti(c){
 
   // Slow downward progression (original: 3px every 8 frames)
   c.mushCooldown++;
-  if(c.mushCooldown%8===0){head.y+=3;}
+  if(c.mushCooldown%8===0){head.y+=4;}
 
   // Mushroom collision - turn and drop down (head only)
   for(let i=0;i<mushrooms.length;i++){
@@ -277,7 +277,7 @@ function updateCenti(c){
   }
 
   // Wall bounce - reverse and drop down (original dropped more at walls)
-  if(head.x<-10||head.x>FIELD_W+10){c.dirX*=-1;head.y+=12;}
+  if(head.x<-10||head.x>FIELD_W+10){c.dirX*=-1;head.y+=15;}
 
   // BUG FIX #13: Body segments follow trail with proper spacing
   for(let i=1;i<c.segs.length;i++){
@@ -513,7 +513,7 @@ function drawScorpion(s){
 // In the original, they appear from wave 3+.
 
 let saucerTimer=0;
-const SAUCER_INTERVAL=540; // spawn saucer every 9 seconds (at wave 3+)
+const SAUCER_INTERVAL=480; // spawn saucer every 8 seconds (at wave 3+)
 
 function spawnSaucer(){
   const fromLeft=Math.random()>0.5;
@@ -1377,17 +1377,17 @@ function loop(){
   }
 
   // Ship movement (field-relative)
-  if(keys.left)ship.x=Math.max(8,ship.x-4);
-  if(keys.right)ship.x=Math.min(FIELD_W-8,ship.x+4);
+  if(keys.left)ship.x=Math.max(8,ship.x-4.5);
+  if(keys.right)ship.x=Math.min(FIELD_W-8,ship.x+4.5);
   // Original Centipede: trackball = full 2D movement
-  if(keys.up)ship.y=Math.max(FIELD_H*0.55,ship.y-4);
-  if(keys.down)ship.y=Math.min(FIELD_H-10,ship.y+4);
+  if(keys.up)ship.y=Math.max(FIELD_H*0.55,ship.y-4.5);
+  if(keys.down)ship.y=Math.min(FIELD_H-10,ship.y+4.5);
 
   // Fire rate with cooldown timer (hold to fire)
   if(keys.fire){
     if(fireTimer<=0){
       // Original Centipede: only ONE bullet on screen at a time
-      if(bullets.length<1){bullets.push({x:ship.x,y:ship.y-14,dy:-9});fireTimer=FIRE_COOLDOWN;playSound('shoot');}
+      if(bullets.length<1){bullets.push({x:ship.x,y:ship.y-14,dy:-10});fireTimer=FIRE_COOLDOWN;playSound('shoot');}
     }
   }
   if(fireTimer>0)fireTimer--;
