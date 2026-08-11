@@ -955,12 +955,14 @@ function drawCenti(c){
         ctx.beginPath();ctx.moveTo(frontX-0.5,sy-seg.h/2+3);ctx.lineTo(frontX+2.5,sy-seg.h/2+3);ctx.stroke();
       }
 
-      // Mandibles (small jaw lines below eyes)
+      // Mandibles (small jaw lines below eyes, with occasional twitch)
+      const mandTwitch=Math.sin(performance.now()/500)*0.5+0.5; // slow twitch cycle
+      const twitchOffset=mandTwitch*1.5;
       ctx.strokeStyle=segColor;ctx.lineWidth=1.5;ctx.shadowBlur=3;
       ctx.beginPath();ctx.moveTo(frontX-2, sy+seg.h/2);
-      ctx.lineTo(frontX-dir*4, sy+seg.h/2+3);ctx.stroke();
+      ctx.lineTo(frontX-dir*(4+twitchOffset), sy+seg.h/2+3);ctx.stroke();
       ctx.beginPath();ctx.moveTo(frontX+2, sy+seg.h/2);
-      ctx.lineTo(frontX-dir*3, sy+seg.h/2+4);ctx.stroke();
+      ctx.lineTo(frontX-dir*(3+twitchOffset), sy+seg.h/2+4);ctx.stroke();
 
       ctx.shadowBlur=0;
         }else if(i===c.segs.length-1){
@@ -1073,6 +1075,12 @@ function drawMush(m){
   // Growth animation: mushrooms grow from small to full size
   if(m.growProgress!==undefined&&m.growProgress<1){
     m.growProgress+=0.05;
+    // Spores while growing
+    if(Math.random()>0.7){
+      particles.push({x:m.x+(Math.random()-0.5)*m.w,y:m.y-m.h*0.3,
+        vx:(Math.random()-0.5)*0.5,vy:-Math.random()*0.8,
+        life:15+Math.random()*10,color:'#4a9040',size:1+Math.random()*0.5});
+    }
     if(m.growProgress>=1){m.growProgress=1;m.w=m.growthTarget||m.w;m.h=m.growthTarget?m.h*1.5:m.h;}
   }
 
@@ -1173,6 +1181,12 @@ function drawShip(s){
   // Gun tip inner (white hot)
   ctx.fillStyle='#fff';ctx.shadowBlur=6;
   ctx.beginPath();ctx.arc(sx,sy-18,1.2,0,Math.PI*2);ctx.fill();
+
+  // Subtle aim line (faint guide from gun tip upward)
+  ctx.strokeStyle='rgba(136,204,255,0.1)';ctx.lineWidth=1;ctx.shadowBlur=0;
+  ctx.setLineDash([2,4]);
+  ctx.beginPath();ctx.moveTo(sx,sy-18);ctx.lineTo(sx,sy-35);ctx.stroke();
+  ctx.setLineDash([]);
 
   // Muzzle flash when firing
   if(muzzleFlash>0){
