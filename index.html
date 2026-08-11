@@ -41,7 +41,8 @@ let highScore=parseInt(localStorage.getItem('centipede_highscore')||'0');
 let extraLifeScore=0;
 
 // Configuration - all coordinates are FIELD-RELATIVE (origin at top-left of play area)
-const FIELD_W=240;
+const FIELD_W=240; // Game logic always runs at this reference width
+const FIELD_H=500; // Fixed field height in game coords
 const GRID_COLS=30;
 const GRID_ROWS=28;
 
@@ -52,11 +53,20 @@ let fireTimer=0;
 // Field offset (where the play area starts on screen)
 const OY=30; // top margin for HUD
 
-function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;}
+// Dynamic scale and offset computed from screen size
+let SCALE=1,OX=0;
+
+function resize(){
+  W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;
+  // Scale field to fit screen with some margins
+  const availW=W-40, availH=H-OY*2;
+  SCALE=Math.min(availW/FIELD_W, availH/FIELD_H, 4); // max 4x
+  OX=(W-FIELD_W*SCALE)/2;
+}
 window.addEventListener('resize',function(){
   resize();
   if(ship&&gameState==='playing'){
-    ship.y=Math.min(ship.y,H-OY-30);
+    ship.y=FIELD_H-30; // keep ship at field bottom
   }
 });
 
@@ -172,7 +182,7 @@ function startGame(){
   waveClearMsg='';waveClearFrames=0;nextWaveDelay=0;
   invincibleTimer=0;fireTimer=0;extraLifeScore=0;saucerTimer=0;
   // Ship position: field-relative (bottom of play area)
-  ship={x:FIELD_W/2,y:H-OY-30};
+  ship={x:FIELD_W/2,y:FIELD_H-30};
   spawnMush();spawnCenti();
   gameState='playing';
 }
@@ -203,7 +213,7 @@ function spawnCenti(offset){
 function spawnMush(){
   // Grid-based mushroom placement for authentic ~65% density
   const cellW=FIELD_W/GRID_COLS;
-  const cellH=(H-OY*2-60)/GRID_ROWS; // leave room for HUD and player zone
+  const cellH=(FIELD_H-60)/GRID_ROWS; // leave room for HUD and player zone
   const startY=35;
 
   for(let r=0;r<GRID_ROWS-3;r++){ // leave bottom 3 rows clear for player
@@ -284,7 +294,7 @@ function updateCenti(c){
 
   // BUG FIX #19: Body segments reaching bottom become mushrooms
   for(let i=c.segs.length-1;i>=1;i--){
-    const fieldBottom=H-OY-20;
+    const fieldBottom=FIELD_H-20;
     if(c.segs[i].y>fieldBottom){
       const fallen=c.segs.splice(i,1)[0];
       // Create a new mushroom where the segment fell
@@ -294,7 +304,7 @@ function updateCenti(c){
   }
 
   // Game over check: field-relative bottom of play area
-  const fieldBottom=H-OY-20; // field height minus margin
+  const fieldBottom=FIELD_H-20; // field height minus margin
   if(head.y>fieldBottom){gameOver=true;}
 }
 
@@ -392,13 +402,13 @@ function updateScorpion(s){
   s.animPhase+=0.15;
 
   // Game over if scorpion reaches bottom
-  const fieldBottom=H-OY-20;
+  const fieldBottom=FIELD_H-20;
   if(s.y>fieldBottom){gameOver=true;}
 }
 
 // Draw scorpion with vector-style graphics
-function drawScorpion(s,ox){
-  const sx=ox+s.x, sy=OY+s.y;
+function drawScorpion(s){
+  const sx=s.x, sy=s.y;
   const t=performance.now()/150;
 
   if(s.state==='cocoon'){
@@ -479,6 +489,7 @@ function drawScorpion(s,ox){
   ctx.beginPath();ctx.arc(sx+2,sy-3,1.5,0,Math.PI*2);ctx.fill();
 
   ctx.shadowBlur=0;
+  ctx.restore();
 }
 
 // === Flying Saucer mechanics ===
@@ -528,8 +539,8 @@ function updateSaucer(s){
   if(s.x<-50||s.x>FIELD_W+50)s.alive=false;
 }
 
-function drawSaucer(s,ox){
-  const sx=ox+s.x, sy=OY+s.y;
+function drawSaucer(s){
+  const sx=s.x, sy=s.y;
   const t=s.animPhase;
 
   // Glow
@@ -558,6 +569,7 @@ function drawSaucer(s,ox){
   ctx.beginPath();ctx.arc(sx+12,sy,1.5,0,Math.PI*2);ctx.fill();
 
   ctx.shadowBlur=0;
+  ctx.restore();
 }
 
 // === Spider mechanics ===
@@ -623,12 +635,12 @@ function updateSpider(s){
   if(s.x>FIELD_W-5){s.x=FIELD_W-5;s.dirX=-1;}
 
   // Game over if spider reaches bottom
-  const fieldBottom=H-OY-20;
+  const fieldBottom=FIELD_H-20;
   if(s.y>fieldBottom){gameOver=true;}
 }
 
-function drawSpider(s,ox){
-  const sx=ox+s.x, sy=OY+s.y;
+function drawSpider(s){
+  const sx=s.x, sy=s.y;
 
   if(s.state==='falling'){
     // Falling: compressed spider shape
@@ -678,6 +690,7 @@ function drawSpider(s,ox){
   }
 
   ctx.shadowBlur=0;
+  ctx.restore();
 }
 // === Color cycling per stage (arcade authentic) ===
 // Original Atari cycled through color palettes every stage.
@@ -691,13 +704,13 @@ const STAGE_COLORS = [
 ];
 function getSC(){return STAGE_COLORS[(wave-1)%STAGE_COLORS.length];}
 
-function drawCenti(c,ox){
+function drawCenti(c){
   const t=performance.now()/200;
 
   for(let i=0;i<c.segs.length;i++){
     const seg=c.segs[i];
     // Convert field-relative to screen coords
-    const sx=ox+seg.x, sy=OY+seg.y;
+    const sx=seg.x, sy=seg.y;
 
     if(i===0){
       // === HEAD: Vector-style with antennae and eyes ===
@@ -827,7 +840,7 @@ function drawCenti(c,ox){
         const prev=c.segs[i-1];
         ctx.strokeStyle=segColor;ctx.lineWidth=1.5;
         ctx.globalAlpha=0.6;
-        ctx.beginPath();ctx.moveTo(ox+prev.x,OY+prev.y);ctx.lineTo(sx,sy);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(prev.x,prev.y);ctx.lineTo(sx,sy);ctx.stroke();
         ctx.globalAlpha=1;
       }
 
@@ -836,8 +849,8 @@ function drawCenti(c,ox){
   }
 }
 
-function drawMush(m,ox){
-  const sx=ox+m.x, sy=OY+m.y;
+function drawMush(m){
+  const sx=m.x, sy=m.y;
   const sc=getSC();
 
   // Vector-style mushroom with glow
@@ -879,10 +892,11 @@ function drawMush(m,ox){
   }
 
   ctx.shadowBlur=0;
+  ctx.restore();
 }
 
-function drawShip(s,ox){
-  const sx=ox+s.x, sy=OY+s.y;
+function drawShip(s){
+  const sx=s.x, sy=s.y;
 
   // Blink when invincible
   if(invincibleTimer>0&&Math.floor(invincibleTimer/4)%2===0)return;
@@ -932,48 +946,49 @@ function drawShip(s,ox){
   ctx.beginPath();ctx.arc(sx,sy-16,1,0,Math.PI*2);ctx.fill();
 
   ctx.shadowBlur=0;
+  ctx.restore();
 }
 
-function drawParticles(ox){
+function drawParticles(){
   for(let i=0;i<particles.length;i++){
     const p=particles[i];ctx.globalAlpha=p.life/35;
     ctx.shadowColor=p.color;ctx.shadowBlur=6;
     ctx.fillStyle=p.color;
     // Convert field-relative to screen coords
-    ctx.beginPath();ctx.arc(ox+p.x,OY+p.y,p.size/2,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(p.x,p.y,p.size/2,0,Math.PI*2);ctx.fill();
   }
   ctx.globalAlpha=1;ctx.shadowBlur=0;
 }
 
-function drawFloatText(ox){
+function drawFloatText(){
   for(let i=0;i<floatText.length;i++){
     const ft=floatText[i];ctx.globalAlpha=Math.min(1,ft.life/20);
     ctx.shadowColor=ft.color;ctx.shadowBlur=8;
     ctx.fillStyle=ft.color;ctx.font='bold 12px monospace';
     // Convert field-relative to screen coords
-    for(let j=0;j<ft.text.length;j++){ctx.fillText(ft.text[j],ox+ft.x,OY+ft.y-j*14);}
+    for(let j=0;j<ft.text.length;j++){ctx.fillText(ft.text[j],ft.x,ft.y-j*14);}
   }
   ctx.globalAlpha=1;ctx.shadowBlur=0;
 }
 
 // === Background grid pattern (arcade authentic vector style) ===
-function drawBackground(ox){
+function drawBackground(){
   // Pure black background
   ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
 
   // Subtle vector-style grid
   ctx.strokeStyle='rgba(0,255,68,0.07)';ctx.lineWidth=1;
-  for(let x=ox;x<ox+FIELD_W;x+=20){ctx.beginPath();ctx.moveTo(x,OY);ctx.lineTo(x,H-OY);ctx.stroke();}
-  for(let y=OY;y<H-OY;y+=20){ctx.beginPath();ctx.moveTo(ox,y);ctx.lineTo(ox+FIELD_W,y);ctx.stroke();}
+  for(let x=0;x<FIELD_W;x+=20){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,FIELD_H);ctx.stroke();}
+  for(let y=0;y<FIELD_H;y+=20){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(FIELD_W,y);ctx.stroke();}
 
   // Intersection dots (vector display aesthetic)
   ctx.fillStyle='rgba(0,255,68,0.1)';
-  for(let x=ox;x<ox+FIELD_W;x+=20){for(let y=OY;y<H-OY;y+=20){ctx.beginPath();ctx.arc(x,y,1,0,Math.PI*2);ctx.fill();}}
+  for(let x=0;x<FIELD_W;x+=20){for(let y=0;y<FIELD_H;y+=20){ctx.beginPath();ctx.arc(x,y,1,0,Math.PI*2);ctx.fill();}}
 }
 
 // === Bullet drawing with glow effect (field-relative) ===
-function drawBullet(b,ox){
-  const sx=ox+b.x, sy=OY+b.y;
+function drawBullet(b){
+  const sx=b.x, sy=b.y;
 
   // Vector-style bullet (bright line with glow)
   ctx.shadowColor='#ffaa22';ctx.shadowBlur=10;
@@ -994,23 +1009,24 @@ function drawBullet(b,ox){
 }
 
 // === Field border with glow effect ===
-function drawFieldBorder(ox){
+function drawFieldBorder(){
   const sc=getSC();
   // Outer border
   ctx.strokeStyle=sc.border;ctx.lineWidth=2;ctx.shadowColor=sc.border;ctx.shadowBlur=8;
-  ctx.strokeRect(ox,OY,FIELD_W,H-OY*2);
+  ctx.strokeRect(0,0,FIELD_W,FIELD_H);
 
   // Inner border (subtle)
   const brgba=sc.border.replace('#','');
   ctx.strokeStyle=`rgba(${parseInt(brgba.slice(0,2),16)},${parseInt(brgba.slice(2,4),16)},${parseInt(brgba.slice(4,6),16)},0.3)`;ctx.lineWidth=1;ctx.shadowBlur=4;
-  ctx.strokeRect(ox+2,OY+2,FIELD_W-4,H-OY*2-4);
+  ctx.strokeRect(2,2,FIELD_W-4,FIELD_H-4);
 
   // Corner decorations
   ctx.fillStyle=sc.border;ctx.shadowBlur=6;const cs=5;
-  ctx.fillRect(ox,OY,cs,cs);ctx.fillRect(ox+FIELD_W-cs,OY,cs,cs);
-  ctx.fillRect(ox,H-OY-cs,cs,cs);ctx.fillRect(ox+FIELD_W-cs,H-OY-cs,cs,cs);
+  ctx.fillRect(0,0,cs,cs);ctx.fillRect(FIELD_W-cs,0,cs,cs);
+  ctx.fillRect(0,FIELD_H-cs,cs,cs);ctx.fillRect(FIELD_W-cs,FIELD_H-cs,cs,cs);
 
   ctx.shadowBlur=0;
+  ctx.restore();
 }
 
 // === HUD with arcade styling ===
@@ -1034,19 +1050,19 @@ function drawHUD(){
 // === Attract/start screen ===
 function drawAttract(){
   ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
-  const ox=(W-FIELD_W)/2;
-  drawBackground(ox);drawFieldBorder(ox);
+  ctx.save();ctx.translate(OX,OY);ctx.scale(SCALE,SCALE);
+  drawBackground();drawFieldBorder();
 
   // Animated centipede crawling across title screen
   const t=performance.now()/300;
   const pulse=Math.sin(t)*0.3+0.7;
 
-  // Crawling demo centipede on screen
-  const crawlY=H*0.45;
+  // Crawling demo centipede on screen (field-relative)
+  const crawlY=FIELD_H*0.35;
   const crawlX=(t*30)%((FIELD_W+60))-30;
   const crawlSegs=12;
   for(let i=0;i<crawlSegs;i++){
-    const sx=ox+crawlX-i*12, sy=crawlY+Math.sin(t*4+i*0.5)*3;
+    const sx=crawlX-i*12, sy=crawlY+Math.sin(t*4+i*0.5)*3;
     const p=i/crawlSegs;
     const r=Math.round(255*(1-p)), g=Math.round(100+155*p);
     const col=`rgb(${r},${g},20)`;
@@ -1055,40 +1071,41 @@ function drawAttract(){
     ctx.beginPath();ctx.ellipse(sx,sy,5+i*0.1,4,0,0,Math.PI*2);ctx.stroke();
   }
   ctx.shadowBlur=0;
+  ctx.restore();
 
-  // Title with glow - vector style
+  // Title with glow - vector style (screen-relative)
   ctx.shadowColor='#ff2200';ctx.shadowBlur=20*pulse;
   ctx.strokeStyle='#ff2200';ctx.lineWidth=3;
   ctx.font='bold 36px monospace';
   const title='CENTIPEDE',tw=ctx.measureText(title).width;
-  ctx.strokeText(title,W/2-tw/2,H*0.25);
+  ctx.strokeText(title,W/2-tw/2,H*0.15);
 
   // Inner fill
   ctx.shadowBlur=10*pulse;
   ctx.fillStyle='rgba(255,34,0,0.3)';
-  ctx.fillText(title,W/2-tw/2,H*0.25);
+  ctx.fillText(title,W/2-tw/2,H*0.15);
 
   // Subtitle
   ctx.shadowBlur=5;ctx.strokeStyle='#8f8';ctx.lineWidth=1.5;
   ctx.font='bold 14px monospace';
   const sub='ATARI ARCADE',sw=ctx.measureText(sub).width;
-  ctx.strokeText(sub,W/2-sw/2,H*0.25+35);
+  ctx.strokeText(sub,W/2-sw/2,H*0.15+35);
   ctx.fillStyle='rgba(136,255,136,0.3)';
-  ctx.fillText(sub,W/2-sw/2,H*0.25+35);
+  ctx.fillText(sub,W/2-sw/2,H*0.15+35);
 
   // Score table (arcade authentic)
   ctx.shadowBlur=0;ctx.fillStyle='#aaa';ctx.font='11px monospace';
   const scores=[['CENTIPEDE SEGMENT','10'],['CENTIPEDE HEAD','50'],['SCORPION','100'],['SPIDER','75'],['FLYING SAUCER','250']];
   scores.forEach((s,i)=>{
-    ctx.fillStyle='#888';ctx.fillText(s[0],W/2-140,H*0.58+i*18);
-    ctx.fillStyle='#ff4';ctx.fillText(s[1],W/2+120,H*0.58+i*18);
+    ctx.fillStyle='#888';ctx.fillText(s[0],W/2-140,H*0.6+i*18);
+    ctx.fillStyle='#ff4';ctx.fillText(s[1],W/2+120,H*0.6+i*18);
   });
 
   // High score
   if(highScore>0){
     ctx.fillStyle='#ff0';ctx.font='bold 14px monospace';ctx.shadowColor='#ff0';ctx.shadowBlur=6;
     const hs='HIGH SCORE: '+highScore,hsw=ctx.measureText(hs).width;
-    ctx.fillText(hs,W/2-hsw/2,H*0.78);ctx.shadowBlur=0;
+    ctx.fillText(hs,W/2-hsw/2,H*0.82);ctx.shadowBlur=0;
   }
 
   // Blinking start prompt
@@ -1097,9 +1114,9 @@ function drawAttract(){
     ctx.shadowColor='#ff4';ctx.shadowBlur=10;
     ctx.strokeStyle='#ff4';ctx.lineWidth=2;ctx.font='bold 16px monospace';
     const start='PRESS SPACE OR TAP',startw=ctx.measureText(start).width;
-    ctx.strokeText(start,W/2-startw/2,H*0.9);
+    ctx.strokeText(start,W/2-startw/2,H*0.92);
     ctx.fillStyle='rgba(255,255,68,0.3)';
-    ctx.fillText(start,W/2-startw/2,H*0.9);
+    ctx.fillText(start,W/2-startw/2,H*0.92);
   }
   ctx.shadowBlur=0;
 }
@@ -1167,6 +1184,7 @@ function drawGameOver(){
     const rt='PRESS SPACE OR TAP',rtW=ctx.measureText(rt).width;
     ctx.fillText(rt,W/2-rtW/2,H/2+85);}
   ctx.shadowBlur=0;
+  ctx.restore();
 }
 
 // === Collision detection (all field-relative) ===
@@ -1309,7 +1327,7 @@ function checkCollisions(){
       lives--;addParticles(ship.x,ship.y,'#2a6aaa',12);playSound('hurt');
       invincibleTimer=120;
       if(lives<=0){gameOver=true;}
-      else ship={x:FIELD_W/2,y:H-OY-30};
+      else ship={x:FIELD_W/2,y:FIELD_H-30};
     }
   }
 }
@@ -1320,7 +1338,7 @@ function checkWaveClear(){
     waveClearMsg='WAVE CLEAR!';waveClearFrames=120;playSound('waveclear');
     // Bonus points for remaining mushrooms
     const mushBonus=mushrooms.length*10;
-    if(mushBonus>0){score+=mushBonus;addFloatText(FIELD_W/2,(H-OY)/2,['MUSH BONUS','+'+mushBonus],'#4f4');}
+    if(mushBonus>0){score+=mushBonus;addFloatText(FIELD_W/2,FIELD_H/2,['MUSH BONUS','+'+mushBonus],'#4f4');}
   }
 }
 
@@ -1357,23 +1375,27 @@ function updateFloatText(){
 // === Main game loop ===
 function loop(){
   ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
-  const ox=(W-FIELD_W)/2;
 
   // Handle attract state
   if(gameState==='attract'){drawAttract();requestAnimationFrame(loop);return;}
 
+  // Save and apply scale transform for game area
+  ctx.save();
+  ctx.translate(OX,OY);
+  ctx.scale(SCALE,SCALE);
+
   // Handle game over state
   if(gameOver){
-    drawBackground(ox);
-    for(let i=0;i<mushrooms.length;i++)drawMush(mushrooms[i],ox);
-    for(let i=0;i<centipedes.length;i++)drawCenti(centipedes[i],ox);
-    for(let i=0;i<scorpions.length;i++)drawScorpion(scorpions[i],ox);
-    for(let i=0;i<saucers.length;i++)drawSaucer(saucers[i],ox);
-    for(let i=0;i<spiders.length;i++)drawSpider(spiders[i],ox);
-    drawFieldBorder(ox);drawGameOver();
+    drawBackground();
+    for(let i=0;i<mushrooms.length;i++)drawMush(mushrooms[i]);
+    for(let i=0;i<centipedes.length;i++)drawCenti(centipedes[i]);
+    for(let i=0;i<scorpions.length;i++)drawScorpion(scorpions[i]);
+    for(let i=0;i<saucers.length;i++)drawSaucer(saucers[i]);
+    for(let i=0;i<spiders.length;i++)drawSpider(spiders[i]);
+    drawFieldBorder();drawGameOver();
+    ctx.restore();
     // Save high score on game over
     if(score>highScore){highScore=score;localStorage.setItem('centipede_highscore',highScore);}
-    // Play game over sound once
     if(gameState!=='gameover')playSound('gameover');
     gameState='gameover';
     requestAnimationFrame(loop);return;
@@ -1424,17 +1446,20 @@ function loop(){
   // Wave management
   checkWaveClear();updateWaveTransition();
 
-  // Draw everything (layered) - all use ox for x-offset, OY for y-offset
-  drawBackground(ox);
-  for(let i=0;i<mushrooms.length;i++)drawMush(mushrooms[i],ox);
-  for(let i=0;i<centipedes.length;i++)drawCenti(centipedes[i],ox);
-  for(let i=0;i<scorpions.length;i++)drawScorpion(scorpions[i],ox);
-  for(let i=0;i<spiders.length;i++)drawSpider(spiders[i],ox);
-  for(let i=0;i<saucers.length;i++)drawSaucer(saucers[i],ox);
-  for(let i=0;i<bullets.length;i++)drawBullet(bullets[i],ox);
-  if(ship)drawShip(ship,ox);
-  drawFieldBorder(ox);
-  drawParticles(ox);drawFloatText(ox);
+  // Draw everything (layered) - canvas transform handles scaling/positioning
+  ctx.save();
+  ctx.translate(OX,OY);ctx.scale(SCALE,SCALE);
+  drawBackground();
+  for(let i=0;i<mushrooms.length;i++)drawMush(mushrooms[i]);
+  for(let i=0;i<centipedes.length;i++)drawCenti(centipedes[i]);
+  for(let i=0;i<scorpions.length;i++)drawScorpion(scorpions[i]);
+  for(let i=0;i<spiders.length;i++)drawSpider(spiders[i]);
+  for(let i=0;i<saucers.length;i++)drawSaucer(saucers[i]);
+  for(let i=0;i<bullets.length;i++)drawBullet(bullets[i]);
+  if(ship)drawShip(ship);
+  drawFieldBorder();
+  drawParticles();drawFloatText();
+  ctx.restore();
   drawHUD();drawWaveClear();
 
   requestAnimationFrame(loop);
