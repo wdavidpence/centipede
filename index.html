@@ -248,26 +248,26 @@ function spawnCenti(offset){
   const segCount=Math.min(15+wave*2,26); // 15 on wave 1, +2 per wave, max 26
   const fromLeft=(wave%2===1);
   const dirX=fromLeft?1:-1;
-  const startX=fromLeft?-5:FIELD_W+5;
+  const startX=fromLeft?-8:FIELD_W+8;
   // Original: odd waves fast, even waves slow (with slight wave-based scaling)
   const isFastWave = (wave % 2 === 1);
-  // Fast waves: ~2px/frame, slow waves: ~0.75px/frame (authentic pacing)
-  // Speed increases slightly each wave
   const baseSpeed = isFastWave ? 2.0 : 0.75;
-  const waveBoost = Math.min(wave * 0.05, 0.5); // +0.05 per wave, max +0.5
+  const waveBoost = Math.min(wave * 0.05, 0.5);
   const spd = baseSpeed + waveBoost;
   const segGap=9;
 
+  // All segments start on the same row, spread horizontally behind entry point
+  const spawnY=5+offset;
   const segs=[];
   for(let i=0;i<segCount;i++){
-    // Spawn at top of field with offset for staggering
-    segs.push({x:startX-i*segGap*dirX,y:5+i*2+offset,w:8,h:6});
+    segs.push({x:startX-i*segGap*dirX,y:spawnY,w:8,h:6});
   }
+  // Pre-fill trail behind the centipede so body segments have history to follow
   const trail=[];
   for(let i=0;i<segCount*3+10;i++){
-    trail.push({x:startX-i*spd*dirX,y:5+i*2+offset});
+    trail.push({x:startX-i*segGap*dirX,y:spawnY});
   }
-  centipedes.push({segs,dirX,speed:spd,mushCooldown:0,trail});
+  centipedes.push({segs,dirX,speed:spd,trail});
 }
 
 function spawnMush(){
@@ -303,62 +303,41 @@ function spawnMush(){
 // === Centipede update (field-relative) ===
 function updateCenti(c){
   const head=c.segs[0];
-  if(!c.mushCooldown)c.mushCooldown=0;
 
   // Record head's current position in trail buffer (before moving)
   if(!c.trail)c.trail=[];
   c.trail.unshift({x:head.x,y:head.y});
   if(c.trail.length>c.segs.length*3+20)c.trail.pop();
 
-  // Move head horizontally
+  // Move head horizontally only
   head.x+=c.dirX*c.speed;
 
-  // Slow downward progression (original: 3px every 8 frames)
-  c.mushCooldown++;
-  if(c.mushCooldown%8===0){head.y+=4;}
-
-  // Mushroom collision - turn and drop down (head only)
-  for(let i=0;i<mushrooms.length;i++){
+  // Mushroom collision - reverse direction and drop down when head hits a mushroom
+  let hitMush=false;
+  for(let i=0;i<mushrooms.length&&!hitMush;i++){
     const m=mushrooms[i];
-    if(head.x+head.w/2>m.x-m.w/2&&head.x-head.w/2<m.x+m.w/2&&
-       head.y+head.h/2>m.y-m.h/2&&head.y-head.h/2<m.y+m.h/2){
-      if(c.mushCooldown>15){c.dirX*=-1;head.y+=12;c.mushCooldown=0;break;}
+    if(Math.hypot(head.x-m.x,head.y-m.y)<m.w/2+4){
+      c.dirX*=-1;
+      head.y+=18; // drop one grid row
+      hitMush=true;
     }
   }
 
-  // Wall bounce - reverse and drop down (original dropped more at walls)
-  if(head.x<-10||head.x>FIELD_W+10){c.dirX*=-1;head.y+=15;}
+  // Wall bounce - reverse and drop down at actual field edges
+  if(head.x<2){head.x=2;c.dirX=1;head.y+=18;}
+  else if(head.x>FIELD_W-2){head.x=FIELD_W-2;c.dirX=-1;head.y+=18;}
 
-  // BUG FIX #13: Body segments follow trail with proper spacing + organic squirm
+  // Body segments follow trail with fixed spacing - no independent mushroom logic or squirm
   for(let i=1;i<c.segs.length;i++){
     const trailIdx=i*2;
     if(trailIdx<c.trail.length){
-      const targetX=c.trail[trailIdx].x;
-      const targetY=c.trail[trailIdx].y;
-      // Check if body segment's target cell has a mushroom - drop down
-      let dropped=false;
-      for(let mi=0;mi<mushrooms.length&&!dropped;mi++){
-        const m=mushrooms[mi];
-        if(Math.hypot(targetX-m.x,targetY-m.y)<m.w/2+4){
-          dropped=true;
-        }
-      }
-      if(dropped){
-        c.segs[i].x=targetX;
-        c.segs[i].y=targetY+8; // drop down one row
-      }else{
-        c.segs[i].x=targetX;
-        c.segs[i].y=targetY;
-      }
-      // Organic squirm: slight sinusoidal wave along body (authentic insectile feel)
-      const squirm=Math.sin(performance.now()/150+i*0.7)*0.8;
-      c.segs[i].y+=squirm*0.3; // subtle vertical wave
-      c.segs[i].x+=Math.cos(performance.now()/180+i*0.5)*0.3; // subtle horizontal sway
+      c.segs[i].x=c.trail[trailIdx].x;
+      c.segs[i].y=c.trail[trailIdx].y;
     }else{
       // If trail is too short, position behind previous segment
       const prev=c.segs[i-1];
       c.segs[i].x=prev.x-c.dirX*8;
-      c.segs[i].y=prev.y+2;
+      c.segs[i].y=prev.y;
     }
   }
 
@@ -375,13 +354,13 @@ function updateCenti(c){
     if(m.centiHitTimer)m.centiHitTimer--;
   }
 
-  // BUG FIX #19: Body segments reaching bottom become mushrooms
+  // Body segments reaching bottom become mushrooms
   for(let i=c.segs.length-1;i>=1;i--){
     const fieldBottom=FIELD_H-20;
     if(c.segs[i].y>fieldBottom){
       const fallen=c.segs.splice(i,1)[0];
       // Create a new mushroom with growth animation (starts small, grows to full size)
-      mushrooms.push({x:fallen.x,y:fieldBottom-5,w:4,h:5,hp:4,spots:[],centiHitTimer:0,growthTarget:1,growProgress:0});
+      mushrooms.push({x:fallen.x,y:fieldBottom-5,w:4,h:5,hp:4,spots:[],centiHitTimer:0,growProgress:0});
       addParticles(fallen.x,fallen.y,'#3a8030',6);
     }
   }
