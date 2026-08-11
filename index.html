@@ -365,7 +365,7 @@ function updateCenti(c){
 
   // Game over check: field-relative bottom of play area
   const fieldBottom=FIELD_H-20; // field height minus margin
-  if(head.y>fieldBottom){gameOver=true;}
+  if(head.y>fieldBottom){gameOver=true;crtPowerOffProgress=0;}
 }
 
 // === Scorpion mechanics ===
@@ -469,7 +469,7 @@ function updateScorpion(s){
 
   // Game over if scorpion reaches bottom
   const fieldBottom=FIELD_H-20;
-  if(s.y>fieldBottom){gameOver=true;}
+  if(s.y>fieldBottom){gameOver=true;crtPowerOffProgress=0;}
 }
 
 // Draw scorpion with vector-style graphics
@@ -748,7 +748,7 @@ function updateSpider(s){
 
   // Game over if spider reaches bottom
   const fieldBottom=FIELD_H-20;
-  if(s.y>fieldBottom){gameOver=true;}
+  if(s.y>fieldBottom){gameOver=true;crtPowerOffProgress=0;}
 }
 
 function drawSpider(s){
@@ -930,6 +930,10 @@ function drawCenti(c){
       // Original: rapid, jumpy leg animation (16fps, not smooth)
       const legPhase=Math.floor(t*8+i*2)%4; // 4 discrete frames
       const legPos = [0, -2, 0, 2][legPhase]; // jumpy positions
+
+      // Small shadow beneath segment (authentic Atari depth effect)
+      ctx.fillStyle='rgba(0,0,0,0.25)';ctx.shadowBlur=0;
+      ctx.beginPath();ctx.arc(sx+1,sy+seg.h/2+1,seg.w*0.35,0,Math.PI*2);ctx.fill();
 
       ctx.shadowColor=segColor;ctx.shadowBlur=6;
       ctx.strokeStyle=segColor;ctx.lineWidth=2;
