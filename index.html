@@ -821,15 +821,6 @@ function drawCenti(c){
       ctx.lineTo(sx+seg.w/3-legPos,sy+seg.h/2+legLen);
       ctx.stroke();
 
-      // Connection line to previous segment (vector-style)
-      if(i>0){
-        const prev=c.segs[i-1];
-        ctx.strokeStyle=segColor;ctx.lineWidth=1.5;
-        ctx.globalAlpha=0.6;
-        ctx.beginPath();ctx.moveTo(prev.x,prev.y);ctx.lineTo(sx,sy);ctx.stroke();
-        ctx.globalAlpha=1;
-      }
-
       ctx.shadowBlur=0;
     }
   }
