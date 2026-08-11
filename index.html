@@ -231,9 +231,9 @@ canvas.addEventListener('click',function(e){
 // === Game initialization ===
 function startGame(){
   score=0;lives=3;wave=1;gameOver=false;
-  bullets=[];centipedes=[];mushrooms=[];scorpions=[];saucers=[];spiders=[];particles=[];floatText=[];
+  bullets=[];centipedes=[];mushrooms=[];scorpions=[];saucers=[];spiders=[];fleas=[];particles=[];floatText=[];
   waveClearMsg='';waveClearFrames=0;nextWaveDelay=0;
-  invincibleTimer=0;fireTimer=0;extraLifeScore=0;saucerTimer=0;
+  invincibleTimer=0;fireTimer=0;extraLifeScore=0;saucerTimer=0;fleaTimer=0;
   // Ship position: field-relative (bottom of play area)
   ship={x:FIELD_W/2,y:FIELD_H-30};
   spawnMush();spawnCenti();
@@ -252,7 +252,10 @@ function spawnCenti(offset){
   // Original: odd waves fast, even waves slow (with slight wave-based scaling)
   const isFastWave = (wave % 2 === 1);
   // Fast waves: ~2px/frame, slow waves: ~0.75px/frame (authentic pacing)
-  const spd = isFastWave ? 2.0 : 0.75;
+  // Speed increases slightly each wave
+  const baseSpeed = isFastWave ? 2.0 : 0.75;
+  const waveBoost = Math.min(wave * 0.05, 0.5); // +0.05 per wave, max +0.5
+  const spd = baseSpeed + waveBoost;
   const segGap=9;
 
   const segs=[];
@@ -278,7 +281,7 @@ function spawnMush(){
       // Seeded random: ~65% fill, with some empty spaces for movement paths
       let seed=r*GRID_COLS+c+42;
       seed=(seed*1103515245+12345)&0x7fffffff;
-      if((seed%100)<60){
+      if((seed%100)<65){
         const spots=[];
         for(let s=0;s<3;s++){
           seed=(seed*1103515245+12345)&0x7fffffff;
@@ -330,8 +333,23 @@ function updateCenti(c){
   for(let i=1;i<c.segs.length;i++){
     const trailIdx=i*2;
     if(trailIdx<c.trail.length){
-      c.segs[i].x=c.trail[trailIdx].x;
-      c.segs[i].y=c.trail[trailIdx].y;
+      const targetX=c.trail[trailIdx].x;
+      const targetY=c.trail[trailIdx].y;
+      // Check if body segment's target cell has a mushroom - drop down
+      let dropped=false;
+      for(let mi=0;mi<mushrooms.length&&!dropped;mi++){
+        const m=mushrooms[mi];
+        if(Math.hypot(targetX-m.x,targetY-m.y)<m.w/2+4){
+          dropped=true;
+        }
+      }
+      if(dropped){
+        c.segs[i].x=targetX;
+        c.segs[i].y=targetY+8; // drop down one row
+      }else{
+        c.segs[i].x=targetX;
+        c.segs[i].y=targetY;
+      }
       // Organic squirm: slight sinusoidal wave along body (authentic insectile feel)
       const squirm=Math.sin(performance.now()/150+i*0.7)*0.8;
       c.segs[i].y+=squirm*0.3; // subtle vertical wave
@@ -885,6 +903,66 @@ function drawSpider(s){
 
   ctx.shadowBlur=0;
 }
+
+// === Flea mechanics ===
+// Fleas are dropped by saucers. They fall diagonally, planting mushrooms
+// as they descend. In the original, they're worth 50 points and are harder
+// to hit than spiders due to their diagonal movement pattern.
+
+let fleaTimer=0;
+const FLEA_INTERVAL=360; // spawn flea every 6 seconds (wave 4+)
+let fleas=[];
+
+function spawnFlea(){
+  const fromLeft=Math.random()>0.5;
+  fleas.push({
+    x: fromLeft ? -10 : FIELD_W+10,
+    y: 25,
+    dirX: fromLeft ? 1 : -1,
+    speed: 2.5+Math.min(wave*0.15, 2),
+    dy: 3,
+    alive: true,
+    animPhase: Math.random()*Math.PI*2,
+    plantTimer: 30+Math.random()*40
+  });
+}
+
+function updateFlea(f){
+  f.animPhase+=0.2;
+  f.x += f.dirX * f.speed;
+  f.y += f.dy;
+  f.plantTimer--;
+  if(f.plantTimer<=0){
+    const cellW=FIELD_W/GRID_COLS;
+    mushrooms.push({x:f.x,y:f.y,w:cellW*0.7,h:cellW*0.6,hp:4,spots:[],centiHitTimer:0,growProgress:0});
+    addParticles(f.x,f.y,'#3a8030',4);
+    f.plantTimer=40+Math.random()*50;
+  }
+  if(f.x<5){f.x=5;f.dirX=1;}
+  if(f.x>FIELD_W-5){f.x=FIELD_W-5;f.dirX=-1;}
+  if(f.y>FIELD_H){f.alive=false;}
+  const fieldBottom=FIELD_H-20;
+  if(f.y>fieldBottom){gameOver=true;crtPowerOffProgress=0;}
+}
+
+function drawFlea(f){
+  const sx=f.x,sy=f.y;
+  ctx.shadowColor='#aaff00';ctx.shadowBlur=10;
+  ctx.strokeStyle='#aaff00';ctx.lineWidth=2;
+  ctx.beginPath();ctx.ellipse(sx,sy,5,4,0,0,Math.PI*2);ctx.stroke();
+  ctx.fillStyle='rgba(170,255,0,0.35)';ctx.fill();
+  const legFrame=Math.floor(performance.now()/60)%4;
+  const lPos=[0,-3,0,3][legFrame];
+  ctx.strokeStyle='#aaff00';ctx.lineWidth=1.5;ctx.shadowBlur=6;
+  ctx.beginPath();ctx.moveTo(sx-4,sy+2);ctx.lineTo(sx-8-lPos,sy+6);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(sx+4,sy+2);ctx.lineTo(sx+8+lPos,sy+6);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(sx-3,sy-2);ctx.lineTo(sx-6+lPos,sy-5);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(sx+3,sy-2);ctx.lineTo(sx+6-lPos,sy-5);ctx.stroke();
+  ctx.fillStyle='#aaff00';ctx.shadowBlur=4;
+  ctx.beginPath();ctx.moveTo(sx+f.dirX*6,sy);ctx.lineTo(sx+f.dirX*3,sy-2);ctx.lineTo(sx+f.dirX*3,sy+2);ctx.closePath();ctx.fill();
+  ctx.shadowBlur=0;
+}
+
 // === Color cycling per stage (arcade authentic) ===
 // Original Atari cycled through color palettes every stage.
 const STAGE_COLORS = [
@@ -939,8 +1017,8 @@ function drawCenti(c){
 
       // Antenna tips (bright dots)
       ctx.fillStyle=sc.centiHead;ctx.shadowBlur=8;
-      ctx.beginPath();ctx.arc(frontX+dir*5, sy-seg.h/2-6+antWave,1.5,0,Math.PI*2);ctx.fill();
-      ctx.beginPath();ctx.arc(frontX+dir*4, sy-seg.h/2-4-antWave,1.5,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(frontX+dir*5, sy-seg.h/2-6+antWave1,1.5,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(frontX+dir*4, sy-seg.h/2-4-antWave2,1.5,0,Math.PI*2);ctx.fill();
 
       // Eyes (white dots on front of head, with periodic blink)
       const eyeBlink=Math.sin(performance.now()/2000)>-0.95; // blink every ~3.5s
@@ -958,7 +1036,7 @@ function drawCenti(c){
       // Mandibles (small jaw lines below eyes, with occasional twitch)
       const mandTwitch=Math.sin(performance.now()/500)*0.5+0.5; // slow twitch cycle
       const twitchOffset=mandTwitch*1.5;
-      ctx.strokeStyle=segColor;ctx.lineWidth=1.5;ctx.shadowBlur=3;
+      ctx.strokeStyle=sc.centiHead;ctx.lineWidth=1.5;ctx.shadowBlur=3;
       ctx.beginPath();ctx.moveTo(frontX-2, sy+seg.h/2);
       ctx.lineTo(frontX-dir*(4+twitchOffset), sy+seg.h/2+3);ctx.stroke();
       ctx.beginPath();ctx.moveTo(frontX+2, sy+seg.h/2);
@@ -1000,7 +1078,7 @@ function drawCenti(c){
       // Tiny trail particles behind tail tip (authentic: dust trail)
       if(Math.random()>0.7){
         particles.push({x:tx+tailWag*0.5,y:sy+seg.h/2+4,vx:(Math.random()-0.5)*1,vy:Math.random()*1+0.5,
-          life:10+Math.random()*8,color:segColor,size:1+Math.random()});
+          life:10+Math.random()*8,color:sc.centiHead,size:1+Math.random()});
       }
 
       ctx.shadowBlur=0;
@@ -1021,16 +1099,6 @@ function drawCenti(c){
       const bodyGlowPulse=Math.sin(performance.now()/200+i*0.5)*0.3+0.7;
       ctx.shadowColor=segColor;ctx.shadowBlur=6*bodyGlowPulse;
 
-      // Joint line connecting to previous segment (subtle)
-      if(i>1){
-        const prev=c.segs[i-1];
-        ctx.strokeStyle=`rgba(${parseInt(segColor.replace('#','').slice(0,2),16)},${parseInt(segColor.replace('#','').slice(2,4),16)},${parseInt(segColor.replace('#','').slice(4,6),16)},0.4)`;
-        ctx.lineWidth=1;ctx.shadowBlur=0;
-        ctx.beginPath();ctx.moveTo(prev.x,prev.y);ctx.lineTo(sx,sy);ctx.stroke();
-      }
-
-      ctx.strokeStyle=segColor;ctx.lineWidth=2;
-
       // Segment body - rectangular shape (original was bitmap, wider than tall)
       ctx.beginPath();
       ctx.rect(sx-seg.w/2-1, sy-seg.h/2, seg.w+2, seg.h);
@@ -1045,13 +1113,13 @@ function drawCenti(c){
       ctx.fillRect(sx-seg.w/3, sy-seg.h/4, seg.w*0.66, seg.h*0.5);
 
       // Animated legs (jumpy, 4-frame animation)
+      const legLen=3;
       // Tiny leg shadow beneath each foot
       ctx.fillStyle='rgba(0,0,0,0.15)';ctx.shadowBlur=0;
       ctx.beginPath();ctx.arc(sx-seg.w/3+legPos,sy+seg.h/2+legLen+1,1.5,0,Math.PI*2);ctx.fill();
       ctx.beginPath();ctx.arc(sx+seg.w/3-legPos,sy+seg.h/2+legLen+1,1.5,0,Math.PI*2);ctx.fill();
 
       ctx.strokeStyle=segColor;ctx.lineWidth=1;ctx.shadowBlur=4;
-      const legLen=3;
       // Left leg
       ctx.beginPath();
       ctx.moveTo(sx-seg.w/4,sy+seg.h/2);
@@ -1073,6 +1141,7 @@ function drawMush(m){
   const sc=getSC();
 
   // Growth animation: mushrooms grow from small to full size
+  let growScale=1;
   if(m.growProgress!==undefined&&m.growProgress<1){
     m.growProgress+=0.05;
     // Spores while growing
@@ -1081,8 +1150,12 @@ function drawMush(m){
         vx:(Math.random()-0.5)*0.5,vy:-Math.random()*0.8,
         life:15+Math.random()*10,color:'#4a9040',size:1+Math.random()*0.5});
     }
-    if(m.growProgress>=1){m.growProgress=1;m.w=m.growthTarget||m.w;m.h=m.growthTarget?m.h*1.5:m.h;}
+    if(m.growProgress>=1){m.growProgress=1;}
+    else{growScale=0.3+m.growProgress*0.7;}
   }
+
+  const mw=m.w*growScale;
+  const mh=m.h*growScale;
 
   // Authentic Atari mushroom: bitmap-style cap + stem + spots
   const mushRgba=sc.mush.replace('#','');
@@ -1093,23 +1166,23 @@ function drawMush(m){
   ctx.shadowColor=sc.mush;ctx.shadowBlur=6;
 
   // Stem (thick, slightly tapered)
-  ctx.strokeStyle=sc.mush;ctx.lineWidth=2.5;
-  ctx.beginPath();ctx.moveTo(sx,sy+3);ctx.lineTo(sx,sy+m.h/2);ctx.stroke();
+  ctx.strokeStyle=sc.mush;ctx.lineWidth=2.5*growScale;
+  ctx.beginPath();ctx.moveTo(sx,sy+3*growScale);ctx.lineTo(sx,sy+mh/2);ctx.stroke();
 
   // Cap - half-ellipse with thicker stroke (authentic bitmap look)
-  ctx.lineWidth=2.5;ctx.shadowBlur=10;
-  ctx.beginPath();ctx.arc(sx,sy,m.w/2,Math.PI,0);ctx.stroke();
+  ctx.lineWidth=2.5*growScale;ctx.shadowBlur=10;
+  ctx.beginPath();ctx.arc(sx,sy,mw/2,Math.PI,0);ctx.stroke();
 
   // Specular highlight on cap (tiny white reflection)
   ctx.fillStyle='rgba(255,255,255,0.15)';ctx.shadowBlur=0;
-  ctx.beginPath();ctx.arc(sx-m.w*0.15,sy-m.w*0.2,m.w*0.12,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(sx-mw*0.15,sy-mw*0.2,mw*0.12,0,Math.PI*2);ctx.fill();
 
   // Cap fill with gradient for depth
-  const capGrad=ctx.createRadialGradient(sx,sy-m.w*0.2,1,sx,sy,m.w/2);
+  const capGrad=ctx.createRadialGradient(sx,sy-mw*0.2,1,sx,sy,mw/2);
   capGrad.addColorStop(0,`rgba(${mr},${mg},${mb},0.45)`);
   capGrad.addColorStop(1,`rgba(${mr},${mg},${mb},0.15)`);
   ctx.fillStyle=capGrad;
-  ctx.beginPath();ctx.arc(sx,sy,m.w/2,Math.PI,0);ctx.fill();
+  ctx.beginPath();ctx.arc(sx,sy,mw/2,Math.PI,0);ctx.fill();
 
   // Spots (white dots on cap) - original had 1-3 spots
   ctx.shadowBlur=3;ctx.fillStyle=`rgba(${Math.min(255,mr+80)},${Math.min(255,mg+80)},${Math.min(255,mb+80)},0.9)`;
@@ -1117,15 +1190,21 @@ function drawMush(m){
     for(let i=0;i<m.spots.length;i++){
       const sp=m.spots[i];
       ctx.beginPath();
-      ctx.arc(sx+Math.cos(sp.angle)*sp.dist,sy+Math.sin(sp.angle)*sp.dist*0.5-3,2.2,0,Math.PI*2);
+      ctx.arc(sx+Math.cos(sp.angle)*sp.dist*growScale,sy+Math.sin(sp.angle)*sp.dist*0.5*growScale-3*growScale,2.2*growScale,0,Math.PI*2);
       ctx.fill();
     }
   }
 
-  // Damage indicator: red tint when damaged (hp < 4)
+  // Damage indicator: red tint when damaged (hp < 4) - shrinking cap
   if(m.hp<4){
-    ctx.fillStyle=`rgba(255,0,0,${0.3*(4-m.hp)})`;
-    ctx.beginPath();ctx.arc(sx,sy,m.w/2,Math.PI,0);ctx.fill();
+    const dmgLevel=(4-m.hp)/4; // 0.25 per hit
+    ctx.fillStyle=`rgba(255,80,0,${dmgLevel*0.35})`;
+    ctx.beginPath();ctx.arc(sx,sy,mw/2,Math.PI,0);ctx.fill();
+    // Crack lines on damaged mushrooms
+    if(m.hp<=2){
+      ctx.strokeStyle=`rgba(255,200,0,${dmgLevel*0.4})`;ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(sx-mw*0.2,sy-mw*0.15);ctx.lineTo(sx+mw*0.1,sy+mw*0.05);ctx.stroke();
+    }
   }
 
   ctx.shadowBlur=0;
@@ -1269,80 +1348,41 @@ function drawCRTOverlay(){
     impactFlash--;
   }
 
-  // Render to offscreen buffer first
+  // CRT barrel distortion + chromatic aberration (optimized for retina displays)
+  // Instead of per-pixel manipulation, use layered canvas draws for the same effect
   crtCtx2d.clearRect(0,0,W,H);
 
-  // Apply barrel distortion + chromatic aberration
-  // Barrel: edges curve inward (classic CRT screen bend)
   const cx=W/2, cy=H/2;
-  const maxR=Math.sqrt(cx*cx+cy*cy);
-  const barrelK=0.12; // curvature strength (0=no curve, 0.3=heavy)
   const chromaAmt=2; // chromatic aberration pixel shift
+  const rgbEdge=2; // pixel width of edge fringing
 
-  // Draw each color channel with slight offset for chromatic aberration
-  // Red channel (shifted right)
+  // Draw the main canvas to offscreen with slight barrel distortion via transform
   crtCtx2d.save();
-  crtCtx2d.globalCompositeOperation='source-over';
-  // Copy the main canvas to offscreen
+  // Subtle barrel: scale edges slightly differently
+  const barrelScale = 1.02; // slight outward curve
+  crtCtx2d.translate(cx,cy);
+  crtCtx2d.scale(barrelScale, barrelScale);
+  crtCtx2d.translate(-cx,-cy);
   crtCtx2d.drawImage(canvas,0,0);
   crtCtx2d.restore();
 
-  // Now apply barrel distortion via pixel manipulation
-  const imgData=crtCtx2d.getImageData(0,0,W,H);
-  const dst=crtCtx2d.createImageData(W,H);
-  const src=imgData.data, d=dst.data;
-
-  // Subsample for performance: process every other pixel in horizontal direction
-  const step=Math.max(1,Math.floor(W/640)); // adapt to screen width
-  for(let y=0;y<H;y++){
-    for(let x=0;x<W;x+=step){
-      // Normalized coords (-1 to 1)
-      const nx=(x-cx)/cx, ny=(y-cy)/cy;
-      const dist=Math.sqrt(nx*nx+ny*ny);
-
-      // Barrel distortion: push pixels outward (inverse mapping)
-      const r2=dist*dist;
-      const barrelFactor=1+barrelK*(r2+r2); // quadratic barrel
-      const sx=(nx*barrelFactor)*cx+cx;
-      const sy=(ny*barrelFactor)*cy+cy;
-
-      // Chromatic aberration: sample R from offset right, B from offset left
-      const chromaX=chromaAmt*dist;
-      const rx=Math.round(sx+chromaX), ry=Math.round(sy);
-      const bx=Math.round(sx-chromaX), by=Math.round(sy);
-
-      // Clamp source coords
-      const rix=Math.max(0,Math.min(W-1,rx)), riy=Math.max(0,Math.min(H-1,ry));
-      const bix=Math.max(0,Math.min(W-1,bx)), biy=Math.max(0,Math.min(H-1,by));
-      const gix=Math.max(0,Math.min(W-1,Math.round(sx))), giy=Math.max(0,Math.min(H-1,Math.round(sy)));
-
-      const ri=(riy*W+rix)*4;
-      const gi=(giy*W+gix)*4;
-      const bi=(biy*W+bix)*4;
-
-      // Fill step-width column
-      for(let s=0;s<step&&x+s<W;s++){
-        const di=(y*W+(x+s))*4;
-        d[di]=src[ri];         // R from right-shifted
-        d[di+1]=src[gi+1];     // G from center
-        d[di+2]=src[bi+2];     // B from left-shifted
-        d[di+3]=src[ri+3];     // A
-      }
-    }
-  }
-  crtCtx2d.putImageData(dst,0,0);
-
-  // Subtle RGB color separation on screen edges (real CRT fringing quirk)
-  const rgbEdge=2; // pixel width of edge fringing
-  for(let ch=0;ch<2;ch++){
-    const offX=rgbEdge*(ch===0?1:-1);
-    crtCtx2d.globalCompositeOperation='lighter';
-    crtCtx2d.globalAlpha=0.03; // very subtle
-    crtCtx2d.drawImage(canvas,offX,0);
-  }
+  // Chromatic aberration via layered draws (much faster than per-pixel)
+  crtCtx2d.globalCompositeOperation='screen';
+  crtCtx2d.globalAlpha=0.04;
+  // Red channel shift (right)
+  crtCtx2d.drawImage(canvas, chromaAmt, 0);
+  // Blue channel shift (left)
+  crtCtx2d.drawImage(canvas, -chromaAmt, 0);
   crtCtx2d.globalAlpha=1;
   crtCtx2d.globalCompositeOperation='source-over';
-  crtCtx2d.putImageData(dst,0,0);
+
+  // Subtle RGB color separation on screen edges (real CRT fringing quirk)
+  crtCtx2d.globalCompositeOperation='lighter';
+  crtCtx2d.globalAlpha=0.03; // very subtle
+  crtCtx2d.drawImage(canvas,rgbEdge,0);
+  crtCtx2d.drawImage(canvas,-rgbEdge,0);
+  crtCtx2d.globalAlpha=1;
+  crtCtx2d.globalCompositeOperation='source-over';
 
   // Draw CRT-processed image back to main canvas
   ctx.restore(); // exit game transform
@@ -1700,7 +1740,7 @@ function drawAttract(){
   // Antenna tips
   ctx.fillStyle=sc.centiHead;ctx.shadowBlur=10;
   ctx.beginPath();ctx.arc(frontX+crawlDir*5, headSy-9+antWave,1.5,0,Math.PI*2);ctx.fill();
-  ctx.beginPath();ctx.arc(frontX+crawlDir*4, headSy-7-antWave,1.5,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(frontX+crawlDir*4, headSy-7+antWave,1.5,0,Math.PI*2);ctx.fill();
   ctx.shadowBlur=0;
   // Flying saucer demo (sweeping across top of field)
   const saucerX=(t*60)%((FIELD_W+100))-50;
@@ -1755,6 +1795,19 @@ function drawAttract(){
     ctx.beginPath();ctx.moveTo(spidX-5,ly);ctx.lineTo(spidX-10-spidLP,ly-1);ctx.lineTo(spidX-13-spidLP*1.5,ly+3);ctx.stroke();
     ctx.beginPath();ctx.moveTo(spidX+5,ly);ctx.lineTo(spidX+10+spidLP,ly-1);ctx.lineTo(spidX+13+spidLP*1.5,ly+3);ctx.stroke();
   }
+  ctx.shadowBlur=0;
+
+  // Flea demo sprite (falling diagonally)
+  const fleaX=(t*20+80)%((FIELD_W+40))-20;
+  const fleaY=FIELD_H*0.45+Math.sin(t*3)*25;
+  const fleaLP=[0,-3,0,3][Math.floor(t*6)%4];
+  ctx.shadowColor='#aaff00';ctx.shadowBlur=10;
+  ctx.strokeStyle='#aaff00';ctx.lineWidth=2;
+  ctx.beginPath();ctx.ellipse(fleaX,fleaY,5,4,0,0,Math.PI*2);ctx.stroke();
+  ctx.fillStyle='rgba(170,255,0,0.35)';ctx.fill();
+  ctx.lineWidth=1.5;ctx.shadowBlur=6;
+  ctx.beginPath();ctx.moveTo(fleaX-4,fleaY+2);ctx.lineTo(fleaX-8-fleaLP,fleaY+6);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(fleaX+4,fleaY+2);ctx.lineTo(fleaX+8+fleaLP,fleaY+6);ctx.stroke();
   ctx.shadowBlur=0;  // Demo explosion (flashing near centipede head when bullet "hits")
   const explFlash=Math.sin(t*10); // rapid flash
   if(explFlash>0.5){
@@ -1819,7 +1872,7 @@ function drawAttract(){
   const scoreStartY=fieldTop+FIELD_H*attractScale+10;
   ctx.textAlign='left';
   ctx.font='bold 10px monospace';
-  const scores=[['CENTIPEDE SEGMENT','10'],['CENTIPEDE HEAD','100'],['SCORPION','100'],['SPIDER','75'],['FLYING SAUCER','250']];
+  const scores=[['CENTIPEDE SEGMENT','10'],['CENTIPEDE HEAD','100'],['SCORPION','100'],['SPIDER','75'],['FLEA','50'],['FLYING SAUCER','250']];
   scores.forEach((s,i)=>{
     const yy=scoreStartY+i*14;
     // Left column: item name with subtle glow
@@ -2173,9 +2226,41 @@ function checkCollisions(){
   }
 }
 
+// Flea bullet collision
+function checkFleaBulletCollisions(){
+  for(let bi=bullets.length-1;bi>=0;bi--){
+    const b=bullets[bi];let fleaHit=false;
+    for(let fi=fleas.length-1;fi>=0&&!fleaHit;fi--){
+      const f=fleas[fi];
+      if(Math.hypot(b.x-f.x,b.y-f.y)<8){
+        bullets.splice(bi,1);fleaHit=true;
+        score+=50;addParticles(f.x,f.y,['#aaff00','#88cc00','#fff'],16,5);
+        addFloatText(f.x,f.y,['FLEA','+50'],'#af0');
+        fleas.splice(fi,1);playSound('hit');
+      }
+    }
+  }
+}
+
+// Flea-player collision
+function checkFleaCollisions(){
+  if(ship&&!gameOver&&invincibleTimer<=0){
+    for(let fi=0;fi<fleas.length;fi++){
+      const f=fleas[fi];
+      if(Math.hypot(ship.x-f.x,ship.y-f.y)<15){
+        lives--;addParticles(ship.x,ship.y,['#2a6aaa','#44aaff','#fff'],12);playSound('hurt');triggerShake(8);
+        invincibleTimer=240;
+        if(lives<=0){gameOver=true;}
+        else ship={x:FIELD_W/2,y:FIELD_H-30};
+        break;
+      }
+    }
+  }
+}
+
 // === Wave management ===
 function checkWaveClear(){
-  if(centipedes.length===0&&scorpions.length===0&&spiders.length===0&&waveClearMsg===''&&nextWaveDelay===0&&!gameOver){
+  if(centipedes.length===0&&scorpions.length===0&&spiders.length===0&&fleas.length===0&&waveClearMsg===''&&nextWaveDelay===0&&!gameOver){
     waveClearMsg='WAVE CLEARED!';waveClearFrames=150;playSound('waveclear');
     // Bonus points for remaining mushrooms
     const mushBonus=mushrooms.length*10;
@@ -2236,6 +2321,7 @@ function loop(){
     for(let i=0;i<scorpions.length;i++)drawScorpion(scorpions[i]);
     for(let i=0;i<saucers.length;i++)drawSaucer(saucers[i]);
     for(let i=0;i<spiders.length;i++)drawSpider(spiders[i]);
+    for(let i=0;i<fleas.length;i++)drawFlea(fleas[i]);
     drawFieldBorder();
     // CRT power-off animation: screen collapses to horizontal line
     if(crtPowerOffProgress<1){crtPowerOffProgress+=0.025;}
@@ -2271,11 +2357,17 @@ function loop(){
   // Saucer spawning (wave 3+)
   if(wave>=3){saucerTimer++;if(saucerTimer>=SAUCER_INTERVAL){spawnSaucer();saucerTimer=0;}}
 
+  // Flea spawning (wave 4+)
+  if(wave>=4){fleaTimer++;if(fleaTimer>=FLEA_INTERVAL){spawnFlea();fleaTimer=0;}}
+
   // Update saucers
   for(let i=saucers.length-1;i>=0;i--){updateSaucer(saucers[i]);if(!saucers[i].alive)saucers.splice(i,1);}
 
   // Update spiders
   for(let i=spiders.length-1;i>=0;i--)updateSpider(spiders[i]);
+
+  // Update fleas
+  for(let i=fleas.length-1;i>=0;i--){updateFlea(fleas[i]);if(!fleas[i].alive)fleas.splice(i,1);}
 
   // Update bullets (field-relative)
   for(let i=bullets.length-1;i>=0;i--){bullets[i].y+=bullets[i].dy;if(bullets[i].y<-10)bullets.splice(i,1);}
@@ -2288,6 +2380,8 @@ function loop(){
 
   // Check collisions
   checkCollisions();
+  checkFleaBulletCollisions();
+  checkFleaCollisions();
 
   // Update invincibility timer
   if(invincibleTimer>0)invincibleTimer--;
@@ -2310,6 +2404,7 @@ function loop(){
   for(let i=0;i<centipedes.length;i++)drawCenti(centipedes[i]);
   for(let i=0;i<scorpions.length;i++)drawScorpion(scorpions[i]);
   for(let i=0;i<spiders.length;i++)drawSpider(spiders[i]);
+  for(let i=0;i<fleas.length;i++)drawFlea(fleas[i]);
   for(let i=0;i<saucers.length;i++)drawSaucer(saucers[i]);
   for(let i=0;i<bullets.length;i++)drawBullet(bullets[i]);
   // Draw saucer bullets (field-relative) - enhanced downward bolts with trail
