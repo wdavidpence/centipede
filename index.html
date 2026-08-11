@@ -1078,27 +1078,26 @@ function drawAttract(){
 // === Wave clear message with animation ===
 function drawWaveClear(){
   if(waveClearMsg&&waveClearFrames>0){
+    // Original: bold green "WAVE CLEAR" centered on screen, pulsing glow
     const pulse=Math.sin(performance.now()/100)*5;
     ctx.shadowColor='#4f4';ctx.shadowBlur=12+pulse;
-    ctx.strokeStyle='#4f4';ctx.lineWidth=2;ctx.font='bold 22px monospace';
+    ctx.strokeStyle='#4f4';ctx.lineWidth=2;ctx.font='bold 24px monospace';
     const tw=ctx.measureText(waveClearMsg).width;
     ctx.strokeText(waveClearMsg,W/2-tw/2,H/2-30);
-    ctx.fillStyle='rgba(68,255,68,0.3)';
+    ctx.fillStyle='rgba(68,255,68,0.4)';
     ctx.fillText(waveClearMsg,W/2-tw/2,H/2-30);
-    ctx.shadowBlur=6;ctx.font='bold 14px monospace';
-    const sub='ALL CLEAR!';const sw=ctx.measureText(sub).width;
-    ctx.strokeText(sub,W/2-sw/2,H/2-6);
     ctx.shadowBlur=0;
   }
 
   if(nextWaveDelay>0){
-    const blink=Math.sin(performance.now()/200)>0;
+    // Original: "NEXT WAVE" blinking
+    const blink=Math.sin(performance.now()/300)>0;
     if(blink){
       ctx.shadowColor='#ff4';ctx.shadowBlur=8;
-      ctx.strokeStyle='#ff4';ctx.lineWidth=2;ctx.font='bold 18px monospace';
-      const nw='NEXT WAVE...';const nw2=ctx.measureText(nw).width;
+      ctx.strokeStyle='#ff4';ctx.lineWidth=2;ctx.font='bold 20px monospace';
+      const nw='NEXT WAVE',nw2=ctx.measureText(nw).width;
       ctx.strokeText(nw,W/2-nw2/2,H/2);
-      ctx.fillStyle='rgba(255,255,68,0.3)';
+      ctx.fillStyle='rgba(255,255,68,0.4)';
       ctx.fillText(nw,W/2-nw2/2,H/2);
       ctx.shadowBlur=0;
     }
