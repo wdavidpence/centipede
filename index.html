@@ -800,12 +800,12 @@ function drawSpider(s){
 // === Color cycling per stage (arcade authentic) ===
 // Original Atari cycled through color palettes every stage.
 const STAGE_COLORS = [
-  {centiHead:'#ff2200', centiTail:'#44ff22', mush:'#00ff44', border:'#00ff44'},
-  {centiHead:'#ff8800', centiTail:'#22ffaa', mush:'#44ff88', border:'#44ff88'},
-  {centiHead:'#ff0088', centiTail:'#88ff44', mush:'#88ff44', border:'#88ff44'},
-  {centiHead:'#00ff88', centiTail:'#44aaff', mush:'#44ffaa', border:'#44ffaa'},
-  {centiHead:'#44aaff', centiTail:'#ff44aa', mush:'#aaff44', border:'#aaff44'},
-  {centiHead:'#ffaa44', centiTail:'#44ff88', mush:'#ffaa44', border:'#ffaa44'},
+  {centiHead:'#ff3333', centiTail:'#44ff22', mush:'#00dd55', border:'#00dd55'},
+  {centiHead:'#ff8833', centiTail:'#22ffbb', mush:'#44dd88', border:'#44dd88'},
+  {centiHead:'#ff33aa', centiTail:'#88dd44', mush:'#88dd44', border:'#88dd44'},
+  {centiHead:'#22ddaa', centiTail:'#44aadd', mush:'#44ddbb', border:'#44ddbb'},
+  {centiHead:'#44aadd', centiTail:'#ff33bb', mush:'#aadd44', border:'#aadd44'},
+  {centiHead:'#ddaa33', centiTail:'#44dd88', mush:'#dda644', border:'#dda644'},
 ];
 function getSC(){return STAGE_COLORS[(wave-1)%STAGE_COLORS.length];}
 
@@ -1497,6 +1497,27 @@ function drawAttract(){
     ctx.beginPath();ctx.moveTo(scorpX-6,ly);ctx.lineTo(scorpX-9-lPos,ly+3);ctx.stroke();
     ctx.beginPath();ctx.moveTo(scorpX+6,ly);ctx.lineTo(scorpX+9+lPos,ly+3);ctx.stroke();
   }
+  ctx.shadowBlur=0;  // Spider demo sprite (crawling near bottom)
+  const spidX=(t*15+50)%((FIELD_W+40))-20;
+  const spidY=FIELD_H*0.65+Math.sin(t*1.5+1)*20;
+  const spidLP=[0,-3,0,3][Math.floor(t*4)%4];
+  ctx.shadowColor='#ff00aa';ctx.shadowBlur=10;
+  ctx.strokeStyle='#ff00aa';ctx.lineWidth=2;
+  ctx.beginPath();ctx.ellipse(spidX,spidY+3,7,6,0,0,Math.PI*2);ctx.stroke();
+  ctx.fillStyle='rgba(255,0,170,0.3)';ctx.fill();
+  ctx.strokeStyle='rgba(255,100,200,0.5)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(spidX-2,spidY);ctx.lineTo(spidX,spidY+3);ctx.lineTo(spidX+2,spidY);ctx.stroke();
+  ctx.strokeStyle='#ff00aa';ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(spidX,spidY-5,5,0,Math.PI*2);ctx.stroke();
+  ctx.fillStyle='#ff4444';ctx.shadowBlur=6;
+  ctx.beginPath();ctx.arc(spidX-2.5,spidY-6,1.5,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(spidX+2.5,spidY-6,1.5,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#ff00aa';ctx.lineWidth=1.5;ctx.shadowBlur=4;
+  for(let i=0;i<4;i++){
+    const ly=spidY-i*2;
+    ctx.beginPath();ctx.moveTo(spidX-5,ly);ctx.lineTo(spidX-10-spidLP,ly-1);ctx.lineTo(spidX-13-spidLP*1.5,ly+3);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(spidX+5,ly);ctx.lineTo(spidX+10+spidLP,ly-1);ctx.lineTo(spidX+13+spidLP*1.5,ly+3);ctx.stroke();
+  }
   ctx.shadowBlur=0;
   ctx.restore();
 
@@ -1516,12 +1537,39 @@ function drawAttract(){
   });
   ctx.shadowBlur=0;
 
+  // Atari logo (centered, iconic style)
+  ctx.textAlign='center';
+  const atariY=scoreStartY-10;
+  ctx.shadowColor='#ff8';ctx.shadowBlur=8;
+  ctx.fillStyle='#ff8';ctx.font='bold 12px monospace';
+  const logo='ATARI',logoW=ctx.measureText(logo).width;
+  ctx.fillText(logo,W/2,atariY);
+  // Atari chevron mark
+  ctx.strokeStyle='#ff8';ctx.lineWidth=1.5;ctx.shadowBlur=4;
+  ctx.beginPath();ctx.moveTo(W/2-10,atariY-2);ctx.lineTo(W/2-5,atariY+3);ctx.lineTo(W/2,atariY-1);ctx.lineTo(W/2+5,atariY+3);ctx.lineTo(W/2+10,atariY-2);ctx.stroke();
+  ctx.shadowBlur=0;
+
   // High score (prominent display)
   if(highScore>0){
-    ctx.fillStyle='#ff0';ctx.font='bold 10px monospace';ctx.shadowColor='#ff0';ctx.shadowBlur=6;
+    ctx.textAlign='center';
+    ctx.fillStyle='#ff0';ctx.font='bold 12px monospace';ctx.shadowColor='#ff0';ctx.shadowBlur=8;
     const hs='HIGH SCORE: '+highScore,hsw=ctx.measureText(hs).width;
-    ctx.fillText(hs,W/2-hsw/2,scoreStartY+scores.length*14+10);ctx.shadowBlur=0;
+    ctx.fillText(hs,W/2,scoreStartY+scores.length*14+16);ctx.shadowBlur=0;
   }
+
+  // Coin counter (authentic arcade cabinet style)
+  const coinY=H-promptH-8;
+  ctx.textAlign='center';
+  // Coin slots (two circles)
+  for(let c=0;c<2;c++){
+    const cx=W/2-15+c*30;
+    ctx.strokeStyle='#888';ctx.lineWidth=1.5;ctx.shadowColor='#888';ctx.shadowBlur=3;
+    ctx.beginPath();ctx.arc(cx,coinY-4,6,0,Math.PI*2);ctx.stroke();
+    ctx.fillStyle='rgba(136,136,136,0.2)';ctx.fill();
+    // Coin slot line
+    ctx.beginPath();ctx.moveTo(cx-3,coinY-4);ctx.lineTo(cx+3,coinY-4);ctx.stroke();
+  }
+  ctx.shadowBlur=0;
 
   // Blinking start prompt at bottom (authentic arcade style)
   const blink=Math.sin(performance.now()/250)>0;
