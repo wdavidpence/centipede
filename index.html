@@ -961,18 +961,16 @@ function drawBullet(b){
 
 // === Field border with glow effect ===
 function drawFieldBorder(){
-  const sc=getSC();
-  // Outer border
-  ctx.strokeStyle=sc.border;ctx.lineWidth=2;ctx.shadowColor=sc.border;ctx.shadowBlur=8;
+  // Original: always green border, not stage-dependent
+  ctx.strokeStyle='#00ff44';ctx.lineWidth=2;ctx.shadowColor='#00ff44';ctx.shadowBlur=8;
   ctx.strokeRect(0,0,FIELD_W,FIELD_H);
 
   // Inner border (subtle)
-  const brgba=sc.border.replace('#','');
-  ctx.strokeStyle=`rgba(${parseInt(brgba.slice(0,2),16)},${parseInt(brgba.slice(2,4),16)},${parseInt(brgba.slice(4,6),16)},0.3)`;ctx.lineWidth=1;ctx.shadowBlur=4;
+  ctx.strokeStyle='rgba(0,255,68,0.3)';ctx.lineWidth=1;ctx.shadowBlur=4;
   ctx.strokeRect(2,2,FIELD_W-4,FIELD_H-4);
 
   // Corner decorations
-  ctx.fillStyle=sc.border;ctx.shadowBlur=6;const cs=5;
+  ctx.fillStyle='#00ff44';ctx.shadowBlur=6;const cs=5;
   ctx.fillRect(0,0,cs,cs);ctx.fillRect(FIELD_W-cs,0,cs,cs);
   ctx.fillRect(0,FIELD_H-cs,cs,cs);ctx.fillRect(FIELD_W-cs,FIELD_H-cs,cs,cs);
 
@@ -1393,7 +1391,7 @@ function loop(){
   for(let i=scorpions.length-1;i>=0;i--)updateScorpion(scorpions[i]);
 
   // Saucer spawning (wave 3+)
-  if(wave>=1){saucerTimer++;if(saucerTimer>=SAUCER_INTERVAL){spawnSaucer();saucerTimer=0;}}
+  if(wave>=3){saucerTimer++;if(saucerTimer>=SAUCER_INTERVAL){spawnSaucer();saucerTimer=0;}}
 
   // Update saucers
   for(let i=saucers.length-1;i>=0;i--){updateSaucer(saucers[i]);if(!saucers[i].alive)saucers.splice(i,1);}
