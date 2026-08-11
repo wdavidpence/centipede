@@ -202,7 +202,7 @@ function startGame(){
 // === Centipede spawning (field-relative) ===
 function spawnCenti(offset){
   offset=offset||0;
-  const segCount=Math.min(15+wave*2,24); // original: 15 on wave 1, +2 per wave, max 24
+  const segCount=Math.min(15+wave*2,26); // 15 on wave 1, +2 per wave, max 26
   const fromLeft=(wave%2===1);
   const dirX=fromLeft?1:-1;
   const startX=fromLeft?-5:FIELD_W+5;
@@ -364,7 +364,7 @@ function updateScorpion(s){
   if(s.pauseTimer>0){s.pauseTimer--;return;}
 
   // Target: player position (field-relative)
-  const targetX=ship.x;
+  const targetX=ship.x; // seek player directly
   const targetY=ship.y;
 
   // Calculate direction toward player
@@ -556,7 +556,7 @@ function updateSaucer(s){
   s.shootTimer--;
   if(s.shootTimer<=0){
     // Fire a bullet downward toward player
-    saucerBullets.push({x:s.x, y:s.y+10, dy:3, life:250});
+    saucerBullets.push({x:s.x, y:s.y+10, dy:3.5, life:250});
     s.shootTimer=50+Math.random()*70;
   }
 
@@ -976,8 +976,8 @@ function drawHUD(){
   ctx.fillText('WAVE '+wave,W-75,OY-8);ctx.shadowBlur=0;
 
   // Display actual high score
-  ctx.fillStyle='#ff0';ctx.font='bold 10px monospace';ctx.shadowColor='#ff0';ctx.shadowBlur=3;
-  ctx.fillText('HI '+highScore,W-80,OY+8);ctx.shadowBlur=0;
+  ctx.fillStyle='#ff0';ctx.font='bold 12px monospace';ctx.shadowColor='#ff0';ctx.shadowBlur=5;
+  ctx.fillText('HI '+highScore,W-90,OY+8);ctx.shadowBlur=0;
 }
 
 // === Attract/start screen ===
@@ -1039,7 +1039,7 @@ function drawAttract(){
   drawFieldBorder();
 
   // Crawling demo centipede (field-relative, rectangular segments)
-  const crawlY=FIELD_H*0.35;
+  const crawlY=FIELD_H*0.3+Math.sin(t*0.5)*FIELD_H*0.1; // vertical wobble
   const crawlX=(t*40)%((FIELD_W+80))-40;
   const sc=getSC();
   for(let i=0;i<12;i++){
@@ -1310,7 +1310,7 @@ function checkCollisions(){
 // === Wave management ===
 function checkWaveClear(){
   if(centipedes.length===0&&scorpions.length===0&&spiders.length===0&&waveClearMsg===''&&nextWaveDelay===0&&!gameOver){
-    waveClearMsg='WAVE CLEARED!';waveClearFrames=120;playSound('waveclear');
+    waveClearMsg='WAVE CLEARED!';waveClearFrames=150;playSound('waveclear');
     // Bonus points for remaining mushrooms
     const mushBonus=mushrooms.length*10;
     if(mushBonus>0){score+=mushBonus;addFloatText(FIELD_W/2,FIELD_H/2,['MUSH BONUS','+'+mushBonus],'#4f4');}
@@ -1321,7 +1321,7 @@ function updateWaveTransition(){
   if(waveClearFrames>0){waveClearFrames--;return;}
   // Set nextWaveDelay after wave clear message finishes
   if(nextWaveDelay>0){nextWaveDelay--;if(nextWaveDelay===0)spawnNextWave();}
-  else if(waveClearFrames===0&&waveClearMsg!==''){nextWaveDelay=90;waveClearMsg='';}
+  else if(waveClearFrames===0&&waveClearMsg!==''){nextWaveDelay=120;waveClearMsg='';}
 }
 
 function spawnNextWave(){
@@ -1387,7 +1387,7 @@ function loop(){
   if(keys.fire){
     if(fireTimer<=0){
       // Original Centipede: only ONE bullet on screen at a time
-      if(bullets.length<1){bullets.push({x:ship.x,y:ship.y-14,dy:-10});fireTimer=FIRE_COOLDOWN;playSound('shoot');}
+      if(bullets.length<1){bullets.push({x:ship.x,y:ship.y-16,dy:-10});fireTimer=FIRE_COOLDOWN;playSound('shoot');}
     }
   }
   if(fireTimer>0)fireTimer--;
