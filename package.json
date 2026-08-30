@@ -1,0 +1,9 @@
+{
+  "name": "centipede",
+  "version": "2.0.0",
+  "description": "Faithful browser recreation of the 1981 Atari arcade classic Centipede",
+  "scripts": {
+    "test": "node test-smoke.js",
+    "verify": "node verify-browser.js"
+  }
+}
