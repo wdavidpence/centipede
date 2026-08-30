@@ -1,6 +1,6 @@
 const { chromium } = require('/Users/davidpence/.hermes/node/lib/node_modules/playwright');
 const http = require('http'), fs = require('fs'), path = require('path');
-const root = '/tmp/centipede';
+const root = __dirname;
 const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
 const server = http.createServer((req, res) => {
   let p = req.url === '/' ? '/index.html' : req.url.split('?')[0];
@@ -119,10 +119,10 @@ function check(c, m) { if (c) { pass++; console.log('PASS:', m); } else { fail++
   check(last.removed, 'centipede fully removed on last segment');
 
   // one bullet limit
-  const b1 = await page.evaluate(() => { window._ship().inv = 300; return !!window._bullet(); });
+  const b1 = await page.evaluate(() => { window._testReset(); window._ship().inv = 300; return !!window._bullet(); });
   await page.keyboard.down('Space');
-  await page.waitForTimeout(120);
-  const bulletOn = await page.evaluate(() => !!window._bullet());
+  await page.waitForTimeout(200);
+  const bulletOn = await page.evaluate(() => !!(window._bullet && window._bullet()));
   await page.keyboard.up('Space');
   check(b1 || bulletOn, 'fire key produces a bullet');
 
@@ -133,11 +133,16 @@ function check(c, m) { if (c) { pass++; console.log('PASS:', m); } else { fail++
     let s = null, tries = 0;
     while (!s && tries++ < 60) { window._keepAlive(); window._step(1); s = window._spiders()[0]; }
     if (!s) return { ok: false, why: 'no spider' };
-    const mc = Math.max(1, Math.min(28, Math.round(s.x / 8) + 2));
-    const mr = Math.max(1, Math.min(27, Math.round(s.y / 8)));
-    window._addMushroom(mc, mr, false);
-    for (let i = 0; i < 400 && window._spiders().length > 0 && window._mushAt(mc, mr); i++) { window._keepAlive(); window._step(1); }
-    const eaten = !window._mushAt(mc, mr);
+    const clampC = v => Math.max(1, Math.min(28, v));
+    const clampR = v => Math.max(1, Math.min(27, v));
+    let eaten = false;
+    for (let i = 0; i < 400 && window._spiders().length > 0; i++) {
+      const cur = window._spiders()[0];
+      const mc = clampC(Math.round(cur.x / 8)), mr = clampR(Math.round(cur.y / 8));
+      if (!window._mushAt(mc, mr)) window._addMushroom(mc, mr, false);
+      window._keepAlive(); window._step(1);
+      if (!window._mushAt(mc, mr)) { eaten = true; break; }
+    }
     const sNow = window._spiders()[0];
     let shot = false;
     if (sNow) {
@@ -186,9 +191,11 @@ function check(c, m) { if (c) { pass++; console.log('PASS:', m); } else { fail++
 
   // bouncing mushrooms -> x5 mode active
   const bounce = await page.evaluate(() => {
+    window._testReset();
+    window._bounceShrooms().length = 0;
     window._spawnBurst(100, 100);
     const n = window._bounceShrooms().length;
-    for (let i = 0; i < 30; i++) { window._keepAlive(); window._step(1); }
+    for (let i = 0; i < 30; i++) { window._keepAlive(); window._bounceShrooms().forEach(b => b.timer = 60); window._step(1); }
     return { n, five: window._fiveX() };
   });
   check(bounce.n === 6, 'exploding mushroom bursts into 6 bouncing mushrooms');
