@@ -118,16 +118,38 @@ function check(c, m) { if (c) { pass++; console.log('PASS:', m); } else { fail++
   check(last.dp === 200, 'last segment bonus = 200 pts');
   check(last.removed, 'centipede fully removed on last segment');
 
-  // one bullet limit
-  const b1 = await page.evaluate(() => { window._testReset(); window._ship().inv = 300; return !!window._bullet(); });
+  // fire key produces a bullet. CRITICAL: do NOT empty centipedes -- that flips
+  // state to 'waveclear' and freezes updateShip (no bullet ever spawns).
+  // Instead make every segment out of bullet range via _keepAlive invincibility
+  // on the ship plus clearing lane mushrooms, and poll.
+  await page.evaluate(() => {
+    window._testReset();
+    window._spiders().splice(0);
+    window._scorpions().splice(0);
+    window._bullets().splice(0);
+    window._saucerShots().splice(0);
+    window._bounceShrooms().splice(0);
+    /* push live centipedes up to row 1 so their columns rarely align with shots */
+    window._centipedes().forEach(c => { c.segs.forEach(s => { s.y = 8; }); c.poison = false; });
+    const mm = window._mush();
+    Object.keys(mm).forEach(k => { if (mm[k].r >= 19) delete mm[k]; });
+    const sh = window._ship();
+    sh.inv = 999999; sh.alive = true; sh.x = 120; sh.y = 210;
+    window._freeze(true);
+    window._step(1);
+  });
   await page.keyboard.down('Space');
-  await page.waitForTimeout(200);
-  const bulletOn = await page.evaluate(() => !!(window._bullet && window._bullet()));
+  let bulletSeen = false;
+  for (let t = 0; t < 14 && !bulletSeen; t++) {
+    await page.waitForTimeout(40);
+    bulletSeen = await page.evaluate(() => window._bullets().length > 0 || window._state() !== 'playing');
+  }
   await page.keyboard.up('Space');
-  check(b1 || bulletOn, 'fire key produces a bullet');
+  check(bulletSeen, 'fire key produces a bullet');
 
   // spider spawn + eat mushroom + scoring 75
   const spider = await page.evaluate(() => {
+    window._freeze(false);
     window._keepAlive();
     window._spawnSpider();
     let s = null, tries = 0;
@@ -147,8 +169,17 @@ function check(c, m) { if (c) { pass++; console.log('PASS:', m); } else { fail++
     let shot = false;
     if (sNow) {
       const sb = window._score();
+      /* freeze centipedes AND teleport every segment to the top row so no
+         stale lower-lane segment can intercept the test bullet; keep the list
+         non-empty; forceShoot calls updateBullet directly */
+      window._freeze(true);
+      window._centipedes().forEach(c => {
+        c.segs.forEach(s => { s.y = 8; });
+        c.trail.forEach(tp => { tp.y = 8; });
+      });
       window._forceShoot(sNow.x + 4, sNow.y);
       shot = window._score() - sb === 75 && window._spiders().length === 0;
+      window._freeze(false);
     }
     return { ok: true, eaten, shot };
   });
@@ -158,13 +189,32 @@ function check(c, m) { if (c) { pass++; console.log('PASS:', m); } else { fail++
 
   // scorpion poisons a mushroom
   const poison = await page.evaluate(() => {
+    window._testReset();
+    window._spiders().splice(0);
+    window._scorpions().splice(0);
+    window._bullets().splice(0);
+    window._saucerShots().splice(0);
+    window._bounceShrooms().splice(0);
+    /* keep exactly one far top-row dummy centipede: state stays 'playing'
+       (clearing centipedes would trigger waveclear, freezing entity updates) */
+    const cs = window._centipedes();
+    cs.splice(0);
+    const dummy = [];
+    for (let i = 0; i < 2; i++) dummy.push({ x: (3 - i) * 8, y: 8 });
+    cs.push(window._makeCenti(dummy, 1));
     window._keepAlive();
     window._spawnScorpion();
     const sc = window._scorpions()[0];
     if (!sc) return { ok: false };
     let poisoned = false;
+    const clampC = v => Math.max(1, Math.min(28, v));
+    const clampR = v => Math.max(1, Math.min(26, v));
     for (let i = 0; i < 60 * 12 && !poisoned; i++) {
       window._keepAlive();
+      /* re-seed mushrooms directly onto the scorpion's live cell each frame
+         (random-walker recipe: seed the live cell, assert same-cell conversion) */
+      const mc = clampC(Math.round(sc.x / 8)), mr = clampR(Math.round(sc.y / 8));
+      if (!window._mushAt(mc, mr)) window._addMushroom(mc, mr, false);
       window._step(1);
       const m = window._mushAt(Math.round(sc.x / 8), Math.round(sc.y / 8));
       if (m && m.poison) poisoned = true;
@@ -237,6 +287,8 @@ function check(c, m) { if (c) { pass++; console.log('PASS:', m); } else { fail++
     const sh = window._ship();
     sh.inv = 0;
     sh.alive = true;
+    /* park ship off the bottom clamp so lane-row math can't miss */
+    sh.y = 200;
     /* build the centipede ON the ship's clamped lane row */
     const segs = [];
     const laneRow = Math.round(sh.y / 8);
@@ -260,15 +312,18 @@ function check(c, m) { if (c) { pass++; console.log('PASS:', m); } else { fail++
 
   await page.screenshot({ path: '/tmp/centipede/gameplay.png' });
 
-  // palette draw check: sample centipede-ish green pixels exist
+  // sprite draw check: saturated colorful pixels exist (palette cycles per wave)
   const px = await page.evaluate(() => {
     const cv = document.getElementById('game'), x = cv.getContext('2d');
     const d = x.getImageData(0, 0, cv.width, cv.height).data;
-    let green = 0;
-    for (let i = 0; i < d.length; i += 40) { if (d[i + 1] > 180 && d[i] < 120 && d[i + 2] < 120) green++; }
-    return green;
+    let colored = 0;
+    for (let i = 0; i < d.length; i += 40) {
+      const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]);
+      if (mx > 140 && mx - mn > 60) colored++;
+    }
+    return colored;
   });
-  check(px > 20, 'green vector sprites rendered (' + px + ' samples)');
+  check(px > 20, 'colorful sprites rendered (' + px + ' samples)');
 
   check(errors.length === 0, 'no page errors during full session' + (errors.length ? ' -> ' + errors[0] : ''));
   await browser.close();

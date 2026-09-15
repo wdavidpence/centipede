@@ -21,8 +21,8 @@ assert(js.includes('ONLY the head drops'), 'head-only drop rule documented/enfor
 assert(js.includes('SAME direction'), 'halves continue same direction');
 assert(js.includes('200 * mult') || js.includes('+200'), 'last segment +200');
 assert(js.includes('100 * mult') || js.includes('+100'), 'head hit 100');
-// One bullet
-assert(/var bullet = null;/.test(js) && js.includes('if (fireHeld && !bullet)'), 'one bullet at a time');
+// Bullet system: modern cadence auto-fire, capped (was 1-trackball in 1981 original)
+assert(/MAX_BULLETS = 2/.test(js) && /FIRE_CD = 9/.test(js) && js.includes('fireCd <= 0'), 'cadence auto-fire, max 2 bullets');
 // Scoring table
 assert(js.includes('addScore(75)'), 'spider 75');
 assert(js.includes('addScore(100)'), 'scorpion/saucer 100');
