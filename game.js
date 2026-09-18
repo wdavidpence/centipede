@@ -7,8 +7,11 @@
      • ONLY THE HEAD drops a row and reverses when blocked (wall or
        mushroom); the body follows via a trail buffer -> winding descent.
      • BODY segment hit (10 pts): becomes a mushroom, centipede splits;
-       BOTH halves continue in SAME direction (NOT reversed).
-     • HEAD hit (100 pts): body continues. LAST segment: +200 bonus.
+       rear half REVERSES so the two halves separate.
+     • HEAD KILL (100 pts): hitting the head kills the ENTIRE centipede
+       (user-spec — no fractured body). LAST segment alone: +200 bonus.
+     • Early waves are gentle (user-spec): slower/simpler ramp, spider
+       harassment is withheld until wave 3 and stays tame to wave 5.
      • Mushrooms take 4 hits (visibly shrink), 5 pts each hit.
      • Poison mushrooms (scorpions) turn centipedes purple -> plunge.
      • Spider (75): erratic, eats mushrooms. Scorpion (100): poisons.
@@ -180,42 +183,53 @@
     }
   }
 
-  /* ── Music: procedural arcade groove ────────────────────────────── */
-  var music = { on: false, eighth: 0, nextAt: 0 };
-  var BASS_ROOTS = [55.0, 65.41, 49.0, 41.2];           /* A C G E minor-ish */
+  /* ── Music: intense arcade gallop ("bumpita bumpita") ───────────── */
+  var music = { on: false, sixteenth: 0, nextAt: 0 };
+  var BASS_ROOTS = [55.0, 55.0, 65.41, 49.0];          /* A A C G minor */
+  /* driving minor riff per bar — 16th-note offsets inside the bar */
+  var RIFF = [[0, 3, 7, 12, 7, 3, 0, -2], [0, 3, 7, 10, 7, 3, 0, 12]];
   var LEAD_SCALE = [440, 523.25, 587.33, 659.25, 783.99, 880];
 
+  function musicBpm() { return 150 + Math.min(wave, 10) * 4; }   /* 154→190 */
   function musicStart() {
     var ac = getAudio(); if (!ac) return;
-    music.on = true; music.eighth = 0; music.nextAt = ac.currentTime + 0.06;
+    music.on = true; music.sixteenth = 0; music.nextAt = ac.currentTime + 0.06;
   }
   function musicStop() { music.on = false; }
 
   function musicTick() {
     var ac = audioCtx;
     if (!music.on || !ac || muted || audioCtx.state !== "running") return;
-    var eighthDur = 0.5 / (132 + Math.min(wave, 8) * 4) ;
-    while (music.nextAt < ac.currentTime + 0.12) {
-      var t = music.nextAt, e = music.eighth % 8, m = music.eighth >> 3;
-      var root = BASS_ROOTS[m % 4];
-      /* kick */
-      if (e === 0 || e === 4) {
-        tone(150, 44, 0.14, "sine", 0.16, musicBus, t - ac.currentTime);
+    var s16 = 15 / musicBpm();
+    while (music.nextAt < ac.currentTime + 0.14) {
+      var t = music.nextAt, d = t - ac.currentTime;
+      var s = music.sixteenth % 16, bar = (music.sixteenth >> 4);
+      var root = BASS_ROOTS[bar % 4];
+      var inten = Math.min(1, (wave - 1) / 6);
+      /* four-on-the-floor kick — the thump */
+      if (s % 4 === 0) tone(160, 42, 0.15, "sine", 0.18, musicBus, d);
+      /* snare clap on 2 and 4 */
+      if (s === 4 || s === 12) noise(0.06, 0.05 + 0.03 * inten, 1900, 900, musicBus, d);
+      /* hats: 8ths always, 16ths when hot */
+      if (s % 2 === 0 || inten > 0.5)
+        noise(s % 4 === 2 ? 0.03 : 0.018, s % 4 === 2 ? 0.018 : 0.011, 8000, 5000, musicBus, d);
+      /* BUMPITA gallop bass: 16th ostinato root(octave bump on & of 2/4) */
+      var oct = (s === 3 || s === 6 || s === 11 || s === 14) ? 2 : 1;
+      if (s % 2 === 0 || wave >= 3)
+        tone(root * oct, root * oct * 0.97, 0.07, "sawtooth", 0.055 + 0.02 * inten, musicBus, d);
+      /* riff stab every 8th on the second half of the bar */
+      if (s % 2 === 1 && s >= 8) {
+        var semi = RIFF[bar % RIFF.length][((s - 8) >> 1) % 8];
+        var f = root * 4 * Math.pow(2, semi / 12);
+        tone(f, f, 0.055, "square", 0.03 + 0.015 * inten, musicBus, d);
       }
-      /* hat */
-      noise(e % 2 ? 0.025 : 0.035, e % 2 ? 0.012 : 0.02, e % 2 ? 7000 : 8500, 4000, musicBus, t - ac.currentTime);
-      /* bass pulse */
-      if (e % 2 === 0) {
-        var oct = (e === 2 || e === 6) ? 2 : 1;
-        tone(root * oct, root * oct * 0.99, 0.12, "sawtooth", 0.07, musicBus, t - ac.currentTime);
+      /* sparkle lead on later waves */
+      if (wave >= 4 && (s === 7 || s === 15)) {
+        var lf = LEAD_SCALE[(music.sixteenth + bar * 3) % LEAD_SCALE.length];
+        tone(lf, lf, 0.07, "square", 0.022, musicBus, d);
       }
-      /* sparse arpeggio sparkle */
-      if ((e === 3 || e === 7) && wave > 1) {
-        var lf = LEAD_SCALE[(music.eighth + m * 3) % LEAD_SCALE.length];
-        tone(lf, lf, 0.07, "square", 0.025, musicBus, t - ac.currentTime);
-      }
-      music.nextAt += eighthDur;
-      music.eighth++;
+      music.nextAt += s16;
+      music.sixteenth++;
     }
   }
 
@@ -644,8 +658,10 @@
 
   /* ── Centipedes: trail-based grid movement ────────────────────────── */
   function speedCells() {
-    var base = (wave % 2 === 1) ? 10 : 6.5;
-    return base + Math.min(wave, 8) * 0.25;
+    /* gentle early ramp (user-spec: too hard too quickly) — wave 1 is a
+       lazy ~7 cells/s crawl, original pacing (~10) arrives near wave 8+ */
+    var base = (wave % 2 === 1) ? 7 : 5;
+    return base + Math.min(wave, 10) * 0.35;
   }
 
   function makeCentipede(segs, dir, startTrail, headIdx, poison) {
@@ -669,8 +685,9 @@
   }
 
   function spawnWaveCentipede() {
-    /* starts SHORT — a small worm that bites mushrooms to grow (user spec) */
-    var n = Math.min(12, 8 + Math.floor((wave - 1) / 2));
+    /* starts SHORT — a small worm that bites mushrooms to grow (user spec);
+       even shorter early so wave 1 is one easy, readable centipede */
+    var n = Math.min(12, 6 + Math.floor(wave / 2));
     var dir = (wave % 2 === 1) ? 1 : -1;
     var startCol = (wave % 2 === 1) ? 1 : COLS - 2;
     var segs = [];
@@ -827,19 +844,24 @@
           var mult = fiveX ? 5 : 1;
           addMushroom(cellOf(s.x), cellOf(s.y), false);
           if (si === 0) {
+            /* HEAD KILL: the entire centipede dies (user-spec). No fractured
+               body continues — body segments burst as particles for free. */
             if (cen.segs.length === 1) {
               addScore(200 * mult);
               floats.push({ x: s.x, y: s.y, text: "+200", color: "#ff5050", life: 70 });
-              centipedes.splice(ci, 1);
               sfx("lastSeg");
               shake = Math.max(shake, 2.5);
             } else {
               addScore(100 * mult);
-              floats.push({ x: s.x, y: s.y, text: "+" + 100 * mult, color: pal().head, life: 60 });
-              cen.segs.shift();
-              cen.trail = initTrail(cen.segs, cen.dir);
+              floats.push({ x: s.x + CELL, y: s.y, text: "+" + 100 * mult, color: pal().head, life: 60 });
               sfx("headHit");
+              shake = Math.max(shake, 2);
+              /* burst every remaining body segment for a satisfying kill */
+              for (var bi2 = 1; bi2 < cen.segs.length; bi2++)
+                burstPx(cen.segs[bi2].x + CELL / 2, cen.segs[bi2].y + CELL / 2, pal().centi, 4);
             }
+            var di = centipedes.indexOf(cen);
+            if (di >= 0) centipedes.splice(di, 1);
           } else {
             addScore(10 * mult);
             floats.push({ x: s.x, y: s.y, text: "+" + 10 * mult, color: "#ffffff", life: 45 });
@@ -866,22 +888,28 @@
   }
 
   /* ── Spider ───────────────────────────────────────────────────────── */
+  /* Spider harassment is withheld until wave 3 (user-spec: first rounds are
+     centipede-only) and stays GENTLE to wave 5 — slower hops, wider
+     scattering, fewer mushrooms eaten — turning menacing at wave 6+. */
+  var spiderTimer = 0;
   function spawnSpider() {
     if (spiders.length >= 2) return;
     var side = Math.random() < 0.5 ? 0 : FW - CELL;
-    spiders.push({ x: side, y: PLAYER_TOP + Math.random() * (FH - PLAYER_TOP - CELL), vx: 0, vy: 0, jump: 0, age: 0 });
+    spiders.push({ x: side, y: PLAYER_TOP + Math.random() * (FH - PLAYER_TOP - CELL), vx: 0, vy: 0, jump: 0, age: 0, nib: 0 });
     sfx("spider");
   }
 
   function updateSpiders() {
+    var gentle = wave <= 5;
     for (var i = spiders.length - 1; i >= 0; i--) {
       var s = spiders[i];
       s.age++;
       if (--s.jump <= 0) {
-        var sp = 2.2 + Math.min(2.4, s.age * 0.004);
-        var ang = Math.atan2(ship.y - s.y + (Math.random() - 0.5) * 60, ship.x - s.x + (Math.random() - 0.5) * 60);
+        var sp = gentle ? 1.1 + Math.min(0.5, s.age * 0.002) : 2.2 + Math.min(2.4, s.age * 0.004);
+        var scatter = gentle ? 120 : 60;
+        var ang = Math.atan2(ship.y - s.y + (Math.random() - 0.5) * scatter, ship.x - s.x + (Math.random() - 0.5) * scatter);
         s.vx = Math.cos(ang) * sp; s.vy = Math.abs(Math.sin(ang)) * sp * (Math.random() < 0.7 ? 1 : -1);
-        s.jump = 10 + Math.floor(Math.random() * 8);
+        s.jump = gentle ? 26 + Math.floor(Math.random() * 18) : 10 + Math.floor(Math.random() * 8);
       }
       s.x += s.vx; s.y += s.vy;
       if (s.x < 0) { s.x = 0; s.vx = Math.abs(s.vx); }
@@ -889,7 +917,11 @@
       if (s.y < CELL) { s.y = CELL; s.vy = Math.abs(s.vy); }
       if (s.y > FH - CELL) { s.y = FH - CELL; s.vy = -Math.abs(s.vy); }
       var m = mushAt(cellOf(s.x), cellOf(s.y));
-      if (m) { delete mush[mkey(m.c, m.r)]; puff(m.c * CELL + 4, m.r * CELL + 4, pal().spider, 5); }
+      /* gentle spiders nibble slowly: only every other mushroom until wave 6 */
+      if (m && (!gentle || s.nib % 2 === 0)) {
+        s.nib++;
+        delete mush[mkey(m.c, m.r)]; puff(m.c * CELL + 4, m.r * CELL + 4, pal().spider, 5);
+      }
     }
   }
 
@@ -1088,8 +1120,9 @@
     bullets.length = 0;
     fiveX = false; rapid = 0; fireCd = 0;
     spawnWaveCentipede();
-    if (Math.random() < 0.18 && wave > 1) bounceShrooms.push({ x: FW / 2, y: PLAYER_TOP, vx: 2.4, vy: -2, bounces: 6 + Math.floor(Math.random() * 4), timer: 420 });
-    saucerTimer = 500 + Math.floor(Math.random() * 400);
+    if (Math.random() < 0.18 && wave > 3) bounceShrooms.push({ x: FW / 2, y: PLAYER_TOP, vx: 2.4, vy: -2, bounces: 6 + Math.floor(Math.random() * 4), timer: 420 });
+    saucerTimer = wave >= 2 ? 500 + Math.floor(Math.random() * 400) : 1400;
+    spiderTimer = 900 + Math.floor(Math.random() * 400);   /* wave-3 spiders enter after ~15s */
     fungiTimer = 480;
     ship.inv = 90;
     bannerT = 110;
@@ -1308,7 +1341,14 @@
     updateFungi();
     updateFx();
 
-    if (Math.random() < 0.0018) spawnSpider();
+    /* spider harassment withheld until wave 3 (user-spec); deterministic-ish
+       timer so waves 1-2 stay centipede-only */
+    if (wave >= 3) {
+      if (--spiderTimer <= 0) {
+        spiderTimer = wave <= 5 ? 1400 + Math.floor(Math.random() * 800) : 700 + Math.floor(Math.random() * 500);
+        spawnSpider();
+      }
+    }
     if (Math.random() < 0.0010) spawnScorpion();
 
     if (centipedes.length === 0 && state === "playing") {
@@ -1563,7 +1603,7 @@
       ctx.fillStyle = "rgba(0,0,0,0.55)";
       ctx.fillRect(0, 0, W, H);
       text("PAUSED", cx, cy - 14, 26, "#39d7ff", "center", 16);
-      if (attractFrame % 60 < 36) text("press P or ESC to resume", cx, cy + 18, 12, "#ffffff", "center", 0);
+      if (frame % 60 < 36) text("press P or ESC to resume", cx, cy + 18, 12, "#ffffff", "center", 0);
     }
     /* float texts */
     for (var k = 0; k < floats.length; k++) {
@@ -1583,50 +1623,135 @@
     text("SCORE  " + String(score).padStart(6, "0"), cx, cy - 2, 16, "#ffffff", "center", 8);
     text("WAVE REACHED  " + wave, cx, cy + 22, 12, "#3fe08a", "center", 0);
     if (score >= highScore && score > 0) text("NEW HIGH SCORE!", cx, cy + 44, 14, rgba("#ffe14d", 0.7 + Math.sin(animT * 8) * 0.3), "center", 12);
-    if (attractFrame % 60 < 36) text("PRESS FIRE TO PLAY AGAIN", cx, cy + 70, 13, "#ffe14d", "center", 6);
+    if (frame % 60 < 36) text("PRESS FIRE TO PLAY AGAIN", cx, cy + 70, 13, "#ffe14d", "center", 6);
   }
 
+  /* ── Attract screen: AAA cinematic title ────────────────────────── */
+  /* Composition rules: dark stage, one hero element (title), one demo
+     element (serpentine centipede descending on a smooth sine), sparse
+     typographic stack. No child-doodle crossing patterns. */
   function drawAttract() {
-    var cx = W / 2, cy = OY;
-    attractFrame++;
+    var cx = W / 2;
     var P = PALETTES[Math.floor(attractFrame / 240) % PALETTES.length];
-    /* title with chromatic wobble */
-    var wob = Math.sin(attractFrame * 0.05) * 2;
-    text("CENTIPEDE", cx - 2, cy + 8 + wob * 0.4, 34, rgba("#ff4060", 0.5), "center", 22);
-    text("CENTIPEDE", cx + 2, cy + 8 - wob * 0.4, 34, rgba("#40d0ff", 0.5), "center", 22);
-    text("CENTIPEDE", cx, cy + 8, 34, "#eaffea", "center", 16);
-    text("MODERN ARCADE REMAKE", cx, cy + 46, 11, rgba(P.centi, 0.9), "center", 6);
+    var t = attractFrame / 60;
+    var fw = FW * SCALE, fh = FH * SCALE;
+    var fx = OX, fy = OY;
 
-    /* demo centipede weaving across the title area, clamped inside border */
+    /* slow-breathing spotlight behind the title */
+    var breath = 0.5 + Math.sin(t * 0.8) * 0.18;
+    var spot = ctx.createRadialGradient(cx, fy + fh * 0.30, 8, cx, fy + fh * 0.30, fw * 0.62);
+    spot.addColorStop(0, rgba(P.border, 0.16 * breath));
+    spot.addColorStop(0.55, rgba(P.border, 0.05 * breath));
+    spot.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = spot;
+    ctx.fillRect(fx, fy, fw, fh);
+
+    /* drifting horizon glow at the player lane */
+    var hor = ctx.createLinearGradient(0, fy + fh * 0.72, 0, fy + fh);
+    hor.addColorStop(0, "rgba(0,0,0,0)");
+    hor.addColorStop(1, rgba(P.centi, 0.10));
+    ctx.fillStyle = hor;
+    ctx.fillRect(fx, fy + fh * 0.72, fw, fh * 0.28);
+
+    /* ── hero title: chromatic split + vertical gradient fill ── */
+    var ts = Math.max(26, Math.min(46, fw * 0.115));
+    var ty = fy + fh * 0.14;
+    var wob = Math.sin(t * 2.1) * 2.2;
+    text("CENTIPEDE", cx - 2.4 - wob * 0.35, ty, ts, rgba("#ff2f5e", 0.55), "center", 26);
+    text("CENTIPEDE", cx + 2.4 + wob * 0.35, ty, ts, rgba("#2fb9ff", 0.55), "center", 26);
+    ctx.font = "bold " + ts + "px 'Courier New', monospace";
+    var tg = ctx.createLinearGradient(0, ty, 0, ty + ts);
+    tg.addColorStop(0, "#ffffff");
+    tg.addColorStop(0.55, mix(P.centi, "#ffffff", 0.25));
+    tg.addColorStop(1, mix(P.centi, "#062a14", 0.35));
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.shadowColor = P.centi; ctx.shadowBlur = 22;
+    ctx.fillStyle = tg;
+    ctx.fillText("CENTIPEDE", cx, ty);
+    ctx.shadowBlur = 0;
+
+    /* animated light-streak underline */
+    var uw = fw * 0.5, ux = cx - uw / 2, uy = ty + ts + 8;
+    ctx.fillStyle = rgba(P.border, 0.28);
+    ctx.fillRect(ux, uy, uw, 2);
+    var streakPos = ux + ((attractFrame * 2.4) % (uw + 90)) - 45;
+    var sg = ctx.createLinearGradient(streakPos - 40, 0, streakPos + 40, 0);
+    sg.addColorStop(0, "rgba(255,255,255,0)");
+    sg.addColorStop(0.5, "#ffffff");
+    sg.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = sg;
+    ctx.fillRect(Math.max(ux, streakPos - 40), uy - 0.5, Math.min(80, ux + uw - Math.max(ux, streakPos - 40)), 3);
+
+    /* subtitle kicker */
+    text("A MODERN ARCADE REMAKE", cx, uy + 10, Math.max(9, ts * 0.26), rgba("#cfe9d8", 0.75), "center", 4);
+
+    /* ── demo centipede: graceful descending sine sweep ── */
     var S = sprSet();
-    for (var i = 9; i >= 0; i--) {
-      var travel = 4 + ((attractFrame * 1.6 + i * CELL) % (FW - 8));
-      var slot = Math.round(i / 9 * 25);
-      blit(S.seg[slot][Math.floor(attractFrame / 8 + i) % 2], travel, 26 + (Math.floor((attractFrame - i * 5) / 24) % 3) * 2, 0.9);
+    var N = 12;
+    var DSCALE = 1.7;                       /* hero showcase scale */
+    var amp = fh * 0.06;
+    var cyc = fw + 240;
+    var lead = (attractFrame * 1.05) % cyc;
+    /* head (i=0) LEADS at max x; body trails behind (lead - i*spacing).
+       Iterate tail->head so head composites on top; tangent is computed
+       from the trailing neighbor toward the head (forward axis). */
+    var posX = [], posY = [];
+    for (var i2 = 0; i2 < N; i2++) {
+      posX[i2] = fx - 80 + ((lead - i2 * CELL * 1.7) % cyc + cyc) % cyc;
+      var kx2 = (posX[i2] - fx) / fw;
+      posY[i2] = fy + fh * 0.42 + Math.sin(kx2 * Math.PI * 2.0 - t * 1.15) * amp + kx2 * fh * 0.08;
+    }
+    for (var i = N - 1; i >= 0; i--) {
+      var px_ = posX[i], py_ = posY[i];
+      if (px_ < fx - 30 || px_ > fx + fw + 30) continue;
+      /* forward vector: toward the neighbor closer to the head */
+      var nb = i === 0 ? null : i - 1;
+      var ax = 0;
+      if (nb !== null) {
+        var ddx = posX[nb] - px_, ddy = posY[nb] - py_;
+        if (Math.abs(ddx) > 0.3 || Math.abs(ddy) > 0.3) ax = Math.atan2(ddy, ddx);
+      }
+      var slot = Math.round(i / (N - 1) * 25);
+      ctx.save();
+      ctx.translate(px_, py_);
+      ctx.rotate(ax);
+      var spr = (i === 0) ? S.head : S.seg[slot][Math.floor(attractFrame / 7 + i) % 2];
+      var dw = spr.w * SCALE * DSCALE, dh = spr.h * SCALE * DSCALE;
+      ctx.globalAlpha = 0.97;
+      /* head bake faces RIGHT (+x forward); body bake forward-axis is -x */
+      if (i !== 0) ctx.rotate(Math.PI);
+      ctx.drawImage(spr.cv, -dw / 2, -dh / 2, dw, dh);
+      ctx.restore();
+      ctx.globalAlpha = 1;
     }
 
-    var rows = [
-      ["CENTIPEDE SEGMENT", "10 PTS  (50 x5)"],
-      ["CENTIPEDE HEAD", "100 PTS  (500 x5)"],
-      ["LAST SEGMENT", "200 PTS"],
-      ["FLYING SAUCER", "50 PTS + RAPID ORB"],
-      ["SPIDER", "75 PTS"],
-      ["SCORPION", "POISONS SHROOMS"],
-      ["MUSHROOM HIT", "5 PTS"],
-      ["EXTRA LIFE", "EVERY 10,000"],
+    /* ── info stack: compact AAA feature strip (measured gutter columns) ── */
+    var iy = fy + fh * 0.60;
+    var feats = [
+      ["SHOOT THE HEAD", "KILLS IT ENTIRELY", P.centi],
+      ["BREAK ITS BODY", "IT SPLITS", "#ffe14d"],
+      ["RIDE THE GALLOP", "INTENSE ARCADE MUSIC", "#39d7ff"],
     ];
-    var ry = OY + FH * SCALE * 0.30;
-    var maxLabel = 0;
+    text("— HOW TO PLAY —", cx, iy - 16, 10, rgba("#b8cfdc", 0.95), "center", 2);
     ctx.font = "bold 11px 'Courier New', monospace";
-    for (var r0 = 0; r0 < rows.length; r0++) maxLabel = Math.max(maxLabel, ctx.measureText(rows[r0][0]).width);
-    var gap = 18;
-    for (var r = 0; r < rows.length; r++) {
-      text(rows[r][0], cx - maxLabel - gap / 2, ry + r * 17, 11, "#9fb8c8");
-      text(rows[r][1], cx - maxLabel - gap / 2 + maxLabel + gap, ry + r * 17, 11, "#ffffff", "left");
+    var lw = 0;
+    for (var fi0 = 0; fi0 < feats.length; fi0++) lw = Math.max(lw, ctx.measureText(feats[fi0][0]).width);
+    var colR = cx - lw - 8, colL = cx + 8;
+    for (var fi = 0; fi < feats.length; fi++) {
+      var fy_ = iy + 8 + fi * 18;
+      var fade = 0.8 + Math.sin(t * 2 + fi * 1.3) * 0.2;
+      text("\u25B8 " + feats[fi][0], colR, fy_, 11, rgba("#eafff2", fade), "right", 2);
+      text(feats[fi][1], colL, fy_, 11, rgba(feats[fi][2], fade), "left", 6);
     }
-    text("ARROWS / WASD  MOVE      SPACE  FIRE      P  PAUSE      M  MUTE", cx, OY + FH * SCALE - 66, 10, "#7f97a8", "center");
-    text("HI-SCORE  " + String(highScore).padStart(6, "0"), cx, OY + FH * SCALE - 46, 13, "#ffe14d", "center", 8);
-    if (attractFrame % 60 < 36) text("PRESS FIRE TO START", cx, OY + FH * SCALE - 22, 15, "#eaffea", "center", 10);
+
+    /* ── CTA: pulsing underline + PRESS FIRE TO START ── */
+    var ctaY = fy + fh - 46;
+    var ctaPulse = 0.7 + Math.sin(t * 4.5) * 0.3;
+    if (frame % 90 < 62) text("PRESS FIRE TO START", cx, ctaY, 15, rgba("#ffffff", ctaPulse), "center", 12);
+    ctx.fillStyle = rgba(P.border, 0.35 + Math.sin(t * 4.5) * 0.15);
+    ctx.fillRect(cx - 92, ctaY + 20, 184, 2);
+    text("HI-SCORE " + String(highScore).padStart(6, "0"), cx, fy + fh - 24, 12, rgba("#ffe14d", 0.85), "center", 6);
+    text("ARROWS/WASD MOVE · SPACE FIRE · P PAUSE · M MUTE", cx, fy + fh - 8, 9, rgba("#9fb4c4", 0.8), "center", 0);
   }
 
   function render() {

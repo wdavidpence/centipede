@@ -38,7 +38,7 @@ function check(c, m) { if (c) { pass++; console.log('PASS:', m); } else { fail++
     };
   });
   check(boot.state === 'playing', 'startGame enters playing');
-  check(boot.segs === 8, 'wave 1 centipede starts short (8 segs, got ' + boot.segs + ')');
+  check(boot.segs === 6, 'wave 1 centipede starts short (6 segs, got ' + boot.segs + ')');
   check(boot.onRow1, 'centipede spawns at top row');
   check(boot.spaced, 'segments spaced exactly one cell apart');
   check(boot.mushCount > 40, 'mushroom field seeded (' + boot.mushCount + ')');
@@ -156,19 +156,43 @@ function check(c, m) { if (c) { pass++; console.log('PASS:', m); } else { fail++
   check(split.dirsOpp, 'rear half reverses — halves go different directions');
   check(split.mushAtSpot, 'destroyed segment becomes a mushroom');
 
-  // head shot -> +100, body continues
+  // head kill -> +100 and ENTIRE centipede dies (user-spec: no fractured body)
   const head = await page.evaluate(() => {
     const cs = window._centipedes();
     const c = cs[0];
     const s0 = window._score();
     const n0 = c.segs.length;
+    const count0 = cs.length;
     const hit = window._shotVsCenti({ x: c.segs[0].x + 4, y: c.segs[0].y + 4 });
-    return { ok: hit, dp: window._score() - s0, still: window._centipedes()[0].segs.length === n0 - 1 };
+    const cs2 = window._centipedes();
+    const gone = !cs2.includes(c);
+    return { ok: hit, dp: window._score() - s0, gone, count0, count1: cs2.length, n0 };
   });
-  check(head.ok && head.dp === 100 && head.still, 'head shot = 100 pts, body continues shorter');
+  check(head.ok && head.dp === 100, 'head shot = 100 pts');
+  check(head.gone, 'head hit kills the ENTIRE centipede (body does not continue)');
+
+  // spider withheld until wave 3 (user-spec: gentle first rounds)
+  const spiderGate = await page.evaluate(() => {
+    window._testReset();
+    window._spiders().length = 0;
+    const origWave = window._wave();
+    let w1 = window._wave();
+    /* simulate ~30s of wave 1/2 play; no spider may self-deploy */
+    let appeared = false;
+    for (let i = 0; i < 1800; i++) {
+      window._keepAlive();
+      if (window._wave() < 3) { if (window._spiders().length > 0) appeared = true; }
+      else break;
+      window._step(1);
+    }
+    const gated = window._wave() < 3 ? !appeared : true;
+    return { gated, wave: window._wave(), appeared };
+  });
+  check(spiderGate.gated, 'no spider harassment during waves 1-2');
 
   // last segment -> +200 and removal
   const last = await page.evaluate(() => {
+    if (window._centipedes().length === 0) window._spawnWave();
     const c = window._centipedes()[0];
     while (c.segs.length > 1) { c.segs.shift(); c.trail = [{ x: c.segs[0].x, y: c.segs[0].y }]; }
     const s0 = window._score();
@@ -190,6 +214,9 @@ function check(c, m) { if (c) { pass++; console.log('PASS:', m); } else { fail++
     window._bullets().splice(0);
     window._saucerShots().splice(0);
     window._bounceShrooms().splice(0);
+    /* head-kill may have emptied the list: guarantee one live centipede so
+       update() doesn't flip to waveclear and freeze updateShip (no bullets) */
+    if (window._centipedes().length === 0) window._spawnWave();
     /* push live centipedes up to row 1 so their columns rarely align with shots */
     window._centipedes().forEach(c => { c.segs.forEach(s => { s.y = 8; }); c.poison = false; });
     const mm = window._mush();
@@ -343,7 +370,7 @@ function check(c, m) { if (c) { pass++; console.log('PASS:', m); } else { fail++
     return { cleared, wave: window._wave(), waveBefore, segs: c ? c.segs.length : 0, state: window._state() };
   });
   check(waveUp.cleared, 'wave clear fires when no centipede segments remain');
-  check(waveUp.wave === waveUp.waveBefore + 1 && waveUp.segs === Math.min(12, 8 + Math.floor((waveUp.wave - 1) / 2)), 'next wave starts short with per-wave growth (w' + waveUp.wave + ' s' + waveUp.segs + ')');
+  check(waveUp.wave === waveUp.waveBefore + 1 && waveUp.segs === Math.min(12, 6 + Math.floor(waveUp.wave / 2)), 'next wave starts short with per-wave growth (w' + waveUp.wave + ' s' + waveUp.segs + ')');
 
   // player death on centipede contact
   const death = await page.evaluate(() => {
