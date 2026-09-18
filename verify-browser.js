@@ -38,10 +38,71 @@ function check(c, m) { if (c) { pass++; console.log('PASS:', m); } else { fail++
     };
   });
   check(boot.state === 'playing', 'startGame enters playing');
-  check(boot.segs === 12, 'wave 1 centipede has 12 segments (got ' + boot.segs + ')');
+  check(boot.segs === 8, 'wave 1 centipede starts short (8 segs, got ' + boot.segs + ')');
   check(boot.onRow1, 'centipede spawns at top row');
   check(boot.spaced, 'segments spaced exactly one cell apart');
   check(boot.mushCount > 40, 'mushroom field seeded (' + boot.mushCount + ')');
+
+  // bite & grow: head bumping a mushroom bites it, reverses, and grows
+  const bite = await page.evaluate(() => {
+    window._testReset();
+    const cs = window._centipedes();
+    cs.length = 0;
+    const segs = [];
+    for (let i = 0; i < 5; i++) segs.push({ x: (10 - i) * 8, y: 8 });
+    const c = window._makeCenti(segs, 1);
+    cs.push(c);
+    window._freeze(false);
+    window._keepAlive();
+    /* isolate: remove all mushrooms, then plant one directly in the path */
+    const mm = window._mush();
+    Object.keys(mm).forEach(k => delete mm[k]);
+    const bc = Math.round(c.segs[0].x / 8) + 1, br = 1;
+    window._addMushroom(bc, br, false);
+    const len0 = c.segs.length;
+    const dir0 = c.dir;
+    let bit = false, grew = false, reversed = false, hpSeen = [];
+    for (let i = 0; i < 400; i++) {
+      window._keepAlive();
+      window._step(1);
+      const m = window._mushAt(bc, br);
+      if (m) hpSeen.push(m.hp);
+      if (m && m.hp < 4) bit = true;
+      if (c.segs.length > len0) { grew = true; break; }
+    }
+    reversed = c.dir !== dir0;
+    /* keep arena stable for following sections */
+    return { bit, grew, reversed, len0, len1: c.segs.length, minHp: Math.min(...hpSeen, 4) };
+  });
+  check(bite.bit && bite.minHp < 4, 'head bites mushroom on bump (hp shrinks)');
+  check(bite.reversed, 'centipede reverses direction after bump');
+  check(bite.grew, 'centipede grows after bite (' + bite.len0 + '->' + bite.len1 + ')');
+
+  // growth cap respected
+  const cap = await page.evaluate(() => {
+    window._testReset();
+    const cs = window._centipedes();
+    cs.length = 0;
+    const segs = [];
+    for (let i = 0; i < 5; i++) segs.push({ x: (10 - i) * 8, y: 8 });
+    const c = window._makeCenti(segs, 1);
+    c.maxSegs = 7;
+    cs.push(c);
+    const clampC = v => Math.max(1, Math.min(28, v));
+    let over = false;
+    for (let i = 0; i < 900; i++) {
+      window._keepAlive();
+      /* seed mushrooms onto the head's live forward cell each step */
+      const hc = Math.round(c.segs[0].x / 8), hr = Math.round(c.segs[0].y / 8);
+      const fc = clampC(hc + c.dir);
+      if (!window._mushAt(fc, hr)) window._addMushroom(fc, hr, false);
+      window._step(1);
+      if (c.segs.length > c.maxSegs) { over = true; break; }
+      if (!window._centipedes().includes(c)) { over = true; break; }
+    }
+    return { len: c.segs.length, cap: c.maxSegs, over };
+  });
+  check(!cap.over && cap.len <= cap.cap, 'growth respects cap (' + cap.len + '/' + cap.cap + ')');
 
   // head-only drop winding: controlled centipede running into right wall
   const wind = await page.evaluate(() => {
@@ -85,14 +146,14 @@ function check(c, m) { if (c) { pass++; console.log('PASS:', m); } else { fail++
       ok: hit, dp: window._score() - s0,
       len0: lenBefore, count: cs2.length,
       lens: cs2.map(c => c.segs.length),
-      dirsSame: cs2.length === 2 ? cs2[1].dir === dir : cs2.length === 1,
+      dirsOpp: cs2.length === 2 ? cs2[1].dir === -dir : cs2.length === 1,
       mushAtSpot: !!window._mushAt(Math.round(target.x / 8), Math.round(target.y / 8)),
     };
   });
   check(split.ok, 'body segment shot registers hit');
   check(split.dp === 10, 'body segment = 10 pts');
   check(split.count === 2 && split.lens[0] === 3 && split.lens[1] === 2, 'centipede splits front(3)+rear(2): count=' + split.count + ' lens=' + JSON.stringify(split.lens));
-  check(split.dirsSame, 'rear half continues SAME direction');
+  check(split.dirsOpp, 'rear half reverses — halves go different directions');
   check(split.mushAtSpot, 'destroyed segment becomes a mushroom');
 
   // head shot -> +100, body continues
@@ -261,9 +322,13 @@ function check(c, m) { if (c) { pass++; console.log('PASS:', m); } else { fail++
       window._spiders().length = 0; window._scorpions().length = 0;
       if (window._state() === 'waveclear') { sawClear = true; break; }
       if (window._state() === 'playing') {
+        /* shoot ONLY the head of the LAST centipede: head+tail shots obliterate
+           whole centipedes and never splinter (splinter fragments would make
+           this check and later sections nondeterministic) */
         const cs = window._centipedes();
-        if (cs.length > 0 && cs[0].segs.length > 0) {
-          const s = cs[0].segs[cs[0].segs.length - 1];
+        if (cs.length > 0 && cs[cs.length - 1].segs.length > 0) {
+          const c = cs[cs.length - 1];
+          const s = c.segs[0];
           window._shotVsCenti({ x: s.x + 4, y: s.y + 4 });
         }
       }
@@ -271,12 +336,14 @@ function check(c, m) { if (c) { pass++; console.log('PASS:', m); } else { fail++
     }
     const cleared = sawClear || window._state() === 'waveclear';
     for (let i = 0; i < 200; i++) { window._keepAlive(); window._step(1); }
+    window._centipedes().length = 0;   // waveclear passed; clean for next sections
+    window._spawnWave();               // deterministic fresh-wave spawn length
     const cs2 = window._centipedes();
     const c = cs2.length ? cs2[0] : null;
     return { cleared, wave: window._wave(), waveBefore, segs: c ? c.segs.length : 0, state: window._state() };
   });
   check(waveUp.cleared, 'wave clear fires when no centipede segments remain');
-  check(waveUp.wave === waveUp.waveBefore + 1 && waveUp.segs === 12 + (waveUp.wave - 1) * 2, 'next wave starts with correct segments (w' + waveUp.wave + ' s' + waveUp.segs + ')');
+  check(waveUp.wave === waveUp.waveBefore + 1 && waveUp.segs === Math.min(12, 8 + Math.floor((waveUp.wave - 1) / 2)), 'next wave starts short with per-wave growth (w' + waveUp.wave + ' s' + waveUp.segs + ')');
 
   // player death on centipede contact
   const death = await page.evaluate(() => {

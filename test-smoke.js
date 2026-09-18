@@ -18,9 +18,13 @@ assert(js.includes('ROWS = 28'), '28-row grid');
 assert(js.includes('function retrace'), 'trail-based segment retrace');
 assert(js.includes('ONLY the head drops'), 'head-only drop rule documented/enforced');
 // Split rules
-assert(js.includes('SAME direction'), 'halves continue same direction');
+assert(js.includes('OPPOSITE'), 'halves travel opposite directions');
 assert(js.includes('200 * mult') || js.includes('+200'), 'last segment +200');
 assert(js.includes('100 * mult') || js.includes('+100'), 'head hit 100');
+// Bite & grow
+assert(js.includes('blocker.hp--'), 'head bites mushrooms on bump');
+assert(js.includes('cen.segs.push'), 'centipede grows from bites');
+assert(js.includes('maxSegs'), 'growth is capped');
 // Bullet system: modern cadence auto-fire, capped (was 1-trackball in 1981 original)
 assert(/MAX_BULLETS = 2/.test(js) && /FIRE_CD = 9/.test(js) && js.includes('fireCd <= 0'), 'cadence auto-fire, max 2 bullets');
 // Scoring table

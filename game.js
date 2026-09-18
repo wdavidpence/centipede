@@ -140,6 +140,8 @@
         noise(0.03, 0.03, 3800, 1200); break;
       case "mushHit":
         tone(1400, 420, 0.05, "triangle", 0.05); break;
+      case "bite":
+        tone(240, 110, 0.05, "square", 0.06); noise(0.03, 0.025, 900, 350); break;
       case "mushDown":
         noise(0.08, 0.06, 2400, 500); tone(300, 120, 0.08, "triangle", 0.04); break;
       case "segHit":
@@ -295,60 +297,95 @@
     g.fillStyle = gr;
   }
 
-  /* segment blob with glossy highlight + stubby animated legs */
+  /* elongated capsule body segment with 3 leg pairs, long axis horizontal.
+     base length 1.6*CELL: slight overlap keeps continuity, strong dark
+     rings keep individual segments readable (no merged bar). */
   function bakeSeg(color, legsPhase) {
-    var s = CELL;
-    return bakeDraw("", s, s, 4, function (g) {
-      /* legs */
+    var s = CELL, w = CELL * 1.6;
+    return bakeDraw("", w, s, 4, function (g) {
+      /* legs along both flanks, alternating gait */
       g.strokeStyle = mix(color, "#000000", 0.25);
-      g.lineWidth = 1.4;
-      var up = legsPhase === 0;
+      g.lineWidth = 1.3;
+      g.lineCap = "round";
+      for (var k = 0; k < 3; k++) {
+        var lx = w * (0.26 + k * 0.24);
+        var sw = (legsPhase === k % 2) ? 1 : -1;
+        g.beginPath();
+        g.moveTo(lx - 1, s * 0.30); g.lineTo(lx - 2.6, s * 0.30 - 3.1 * (1 + sw * 0.35));
+        g.moveTo(lx + 1, s * 0.70); g.lineTo(lx + 2.6, s * 0.70 + 3.1 * (1 - sw * 0.35));
+        g.stroke();
+      }
+      /* capsule body: wider toward head end (left) tapering to tail (right) */
+      radal(g, w * 0.35, s * 0.32, w * 0.8, [[0, mix(color, "#ffffff", 0.55)], [0.45, color], [1, mix(color, "#000000", 0.45)]]);
+      var hh = s * 0.40, ht = s * 0.28;
       g.beginPath();
-      g.moveTo(1, s * (up ? 0.35 : 0.55)); g.lineTo(-2.4, s * (up ? 0.12 : 0.72));
-      g.moveTo(s - 1, s * (up ? 0.35 : 0.55)); g.lineTo(s + 2.4, s * (up ? 0.12 : 0.72));
-      g.moveTo(1, s * (up ? 0.62 : 0.78)); g.lineTo(-2.2, s * (up ? 0.85 : 0.95));
-      g.moveTo(s - 1, s * (up ? 0.62 : 0.78)); g.lineTo(s + 2.2, s * (up ? 0.85 : 0.95));
-      g.stroke();
-      /* body blob */
-      radal(g, s * 0.38, s * 0.32, s * 0.75, [[0, mix(color, "#ffffff", 0.55)], [0.45, color], [1, mix(color, "#000000", 0.45)]]);
-      g.beginPath(); g.arc(s / 2, s / 2, s * 0.44, 0, Math.PI * 2); g.fill();
-      /* rim */
-      g.strokeStyle = mix(color, "#000000", 0.55); g.lineWidth = 0.8;
-      g.beginPath(); g.arc(s / 2, s / 2, s * 0.44, 0, Math.PI * 2); g.stroke();
-      /* gloss */
-      g.fillStyle = "rgba(255,255,255,0.5)";
-      g.beginPath(); g.ellipse(s * 0.38, s * 0.3, s * 0.16, s * 0.09, -0.6, 0, Math.PI * 2); g.fill();
+      g.moveTo(w * 0.5, s * 0.5 - hh);
+      g.quadraticCurveTo(w, s * 0.5 - ht * 0.9, w - 0.4, s * 0.5);
+      g.quadraticCurveTo(w, s * 0.5 + ht * 0.9, w * 0.5, s * 0.5 + hh);
+      g.quadraticCurveTo(w * 0.12, s * 0.5 + hh, w * 0.06, s * 0.5);
+      g.quadraticCurveTo(w * 0.12, s * 0.5 - hh, w * 0.5, s * 0.5 - hh);
+      g.closePath(); g.fill();
+      /* rim + bold segment ring (readability between adjacent segments) */
+      g.strokeStyle = mix(color, "#000000", 0.75); g.lineWidth = 1;
+      g.beginPath();
+      g.moveTo(w * 0.5, s * 0.5 - hh);
+      g.quadraticCurveTo(w, s * 0.5 - ht * 0.9, w - 0.4, s * 0.5);
+      g.quadraticCurveTo(w, s * 0.5 + ht * 0.9, w * 0.5, s * 0.5 + hh);
+      g.quadraticCurveTo(w * 0.12, s * 0.5 + hh, w * 0.06, s * 0.5);
+      g.quadraticCurveTo(w * 0.12, s * 0.5 - hh, w * 0.5, s * 0.5 - hh);
+      g.closePath(); g.stroke();
+      /* joint ring near the TAIL edge so adjacent segments show one clean
+         divider at their junction, not a stripe across the middle */
+      g.strokeStyle = mix(color, "#000000", 0.4); g.lineWidth = 0.9;
+      g.beginPath(); g.ellipse(w * 0.88, s * 0.5, w * 0.045, s * 0.26, 0, 0, Math.PI * 2); g.stroke();
+      /* gloss streak */
+      g.fillStyle = "rgba(255,255,255,0.45)";
+      g.beginPath(); g.ellipse(w * 0.4, s * 0.3, w * 0.2, s * 0.06, -0.15, 0, Math.PI * 2); g.fill();
     });
   }
 
-  function bakeHead(color) {
-    return bakeDraw("", CELL, CELL, 6, function (g) {
-      var s = CELL;
-      /* antennae */
-      g.strokeStyle = mix(color, "#ffffff", 0.3); g.lineWidth = 1.1;
+  /* elongated head, facing RIGHT (render flips for dir=-1); open jaws.
+     Distinct from body: bigger silhouette, dark outline, bright white jaws
+     and eye rings so the leading end always reads as the head. */
+  function bakeHead(color, jawsOpen) {
+    var s = CELL * 1.12, w = CELL * 1.55;
+    return bakeDraw("", w, s, 6, function (g) {
+      /* antennae swept back */
+      g.strokeStyle = mix(color, "#ffffff", 0.3); g.lineWidth = 1.1; g.lineCap = "round";
       g.beginPath();
-      g.moveTo(s * 0.3, s * 0.18); g.quadraticCurveTo(s * 0.18, -2.4, s * 0.05, -3.4);
-      g.moveTo(s * 0.7, s * 0.18); g.quadraticCurveTo(s * 0.82, -2.4, s * 0.95, -3.4);
+      g.moveTo(w * 0.72, s * 0.22); g.quadraticCurveTo(w * 0.85, -1.8, w * 1.0 + 3, -3.2);
+      g.moveTo(w * 0.72, s * 0.78); g.quadraticCurveTo(w * 0.85, s + 1.8, w * 1.0 + 3, s + 3.2);
       g.stroke();
       g.fillStyle = "#ffffff";
-      g.beginPath(); g.arc(s * 0.05, -3.4, 0.9, 0, 7); g.fill();
-      g.beginPath(); g.arc(s * 0.95, -3.4, 0.9, 0, 7); g.fill();
-      /* mandibles */
-      g.fillStyle = mix(color, "#ffffff", 0.25);
-      g.beginPath(); g.moveTo(s * 0.22, s * 0.1); g.lineTo(s * 0.08, -1.6); g.lineTo(s * 0.38, s * 0.02); g.closePath(); g.fill();
-      g.beginPath(); g.moveTo(s * 0.78, s * 0.1); g.lineTo(s * 0.92, -1.6); g.lineTo(s * 0.62, s * 0.02); g.closePath(); g.fill();
-      /* skull */
-      radal(g, s * 0.4, s * 0.35, s * 0.8, [[0, mix(color, "#ffffff", 0.7)], [0.5, color], [1, mix(color, "#000000", 0.5)]]);
-      g.beginPath(); g.arc(s / 2, s / 2, s * 0.5, 0, Math.PI * 2); g.fill();
-      g.strokeStyle = mix(color, "#000000", 0.6); g.lineWidth = 0.8;
-      g.beginPath(); g.arc(s / 2, s / 2, s * 0.5, 0, Math.PI * 2); g.stroke();
-      /* eyes */
-      g.fillStyle = "#0a0f0a";
-      g.beginPath(); g.arc(s * 0.34, s * 0.34, 1.15, 0, 7); g.fill();
-      g.beginPath(); g.arc(s * 0.66, s * 0.34, 1.15, 0, 7); g.fill();
+      g.beginPath(); g.arc(w + 3, -3.2, 0.9, 0, 7); g.fill();
+      g.beginPath(); g.arc(w + 3, s + 3.2, 0.9, 0, 7); g.fill();
+      /* mandibles at right edge; bright white so head leads visibly;
+         open wide when chomping */
+      var gj = jawsOpen ? 2.6 : 1.2;
+      g.fillStyle = "#ffffff";
+      g.beginPath(); g.moveTo(w * 0.78, s * 0.5 - gj); g.lineTo(w + gj * 1.6, s * 0.5 - gj * 2.2); g.lineTo(w * 0.92, s * 0.5 - gj * 0.2); g.closePath(); g.fill();
+      g.beginPath(); g.moveTo(w * 0.78, s * 0.5 + gj); g.lineTo(w + gj * 1.6, s * 0.5 + gj * 2.2); g.lineTo(w * 0.92, s * 0.5 + gj * 0.2); g.closePath(); g.fill();
+      /* skull: blunt rounded-front capsule */
+      radal(g, w * 0.35, s * 0.32, w * 0.85, [[0, mix(color, "#ffffff", 0.7)], [0.5, color], [1, mix(color, "#000000", 0.5)]]);
+      g.beginPath();
+      g.moveTo(w * 0.1, s * 0.5 - s * 0.44);
+      g.lineTo(w * 0.62, s * 0.5 - s * 0.42);
+      g.quadraticCurveTo(w * 0.95, s * 0.5 - s * 0.34, w * 0.95, s * 0.5);
+      g.quadraticCurveTo(w * 0.95, s * 0.5 + s * 0.34, w * 0.62, s * 0.5 + s * 0.42);
+      g.lineTo(w * 0.1, s * 0.5 + s * 0.44);
+      g.quadraticCurveTo(-1.4, s * 0.5, w * 0.1, s * 0.5 - s * 0.44);
+      g.closePath(); g.fill();
+      g.strokeStyle = mix(color, "#000000", 0.85); g.lineWidth = 1.2;
+      g.stroke();
+      /* cluster eyes with bright rings */
+      g.strokeStyle = "#ffffff"; g.lineWidth = 0.7;
+      [[0.68, 0.34], [0.8, 0.44], [0.68, 0.66], [0.8, 0.56]].forEach(function (p) {
+        g.fillStyle = "#0a0f0a";
+        g.beginPath(); g.arc(w * p[0], s * p[1], 1.15, 0, 7); g.fill(); g.stroke();
+      });
       g.fillStyle = "#fff";
-      g.beginPath(); g.arc(s * 0.36, s * 0.31, 0.45, 0, 7); g.fill();
-      g.beginPath(); g.arc(s * 0.68, s * 0.31, 0.45, 0, 7); g.fill();
+      g.beginPath(); g.arc(w * 0.7, s * 0.31, 0.42, 0, 7); g.fill();
+      g.beginPath(); g.arc(w * 0.7, s * 0.69, 0.42, 0, 7); g.fill();
     });
   }
 
@@ -542,8 +579,10 @@
       var pc = mix(POISON_COLOR, TAIL_COLOR, t * 0.6);
       set.segPoison[i] = [bakeSeg(pc, 0), bakeSeg(pc, 1)];
     }
-    set.head = bakeHead(P.head);
-    set.headPoison = bakeHead("#ff5ce8");
+    set.head = bakeHead(P.head, false);
+    set.headOpen = bakeHead(P.head, true);
+    set.headPoison = bakeHead("#ff5ce8", false);
+    set.headPoisonOpen = bakeHead("#ff5ce8", true);
     set.mush = [];
     for (var hp = 1; hp <= 4; hp++) {
       set.mush[hp] = bakeMush(P.mush, hp, false);
@@ -614,27 +653,33 @@
     return {
       segs: segs, trail: trail, dir: dir,
       acc: 0, poison: !!poison, headIdx: headIdx || 0,
-      zig: 0, dropping: 0,
+      zig: 0, dropping: 0, bites: 0, chomp: 0,
+      maxSegs: Math.max(segs.length + 6, 16),
     };
   }
 
   function initTrail(segs, dir) {
+    /* history must cover the full body span (n-1)*CELL plus margin,
+       otherwise tail segments collapse onto the trail's last point */
     var t = [{ x: segs[0].x, y: segs[0].y }];
-    for (var i = 1; i < segs.length * 3 + 40; i++) {
+    for (var i = 1; i < segs.length * CELL + 40; i++) {
       t.push({ x: segs[0].x - dir * i, y: segs[0].y });
     }
     return t;
   }
 
   function spawnWaveCentipede() {
-    var n = Math.min(26, 12 + (wave - 1) * 2);
+    /* starts SHORT — a small worm that bites mushrooms to grow (user spec) */
+    var n = Math.min(12, 8 + Math.floor((wave - 1) / 2));
     var dir = (wave % 2 === 1) ? 1 : -1;
     var startCol = (wave % 2 === 1) ? 1 : COLS - 2;
     var segs = [];
     for (var i = 0; i < n; i++) {
       segs.push({ x: (startCol - dir * i) * CELL, y: CELL });
     }
-    centipedes.push(makeCentipede(segs, dir, null, 0, false));
+    var cen = makeCentipede(segs, dir, null, 0, false);
+    cen.maxSegs = Math.min(24, n + 10);
+    centipedes.push(cen);
   }
 
   function retrace(cen) {
@@ -643,21 +688,30 @@
     cen.segs[0].x = trail[0].x; cen.segs[0].y = trail[0].y;
     for (var i = 1; i < cen.segs.length; i++) {
       var want = i * CELL;
-      while (acc2 < want - 0.0001 && idx + 1 < trail.length) {
+      /* advance the junction until the segment's arc length lands inside
+         [acc2, acc2+dd). Strict '<' so exact junction landings advance
+         cleanly instead of stacking every segment on one point. */
+      while (idx + 1 < trail.length - 1) {
         var a = trail[idx], b = trail[idx + 1];
         var dd = Math.hypot(b.x - a.x, b.y - a.y);
-        if (acc2 + dd >= want) {
-          var t = (want - acc2) / (dd || 1);
-          cen.segs[i].x = a.x + (b.x - a.x) * t;
-          cen.segs[i].y = a.y + (b.y - a.y) * t;
-          acc2 = want;
-          break;
-        }
+        if (dd > 0 && acc2 + dd >= want) break;
         acc2 += dd; idx++;
       }
-      if (acc2 < want - 0.0001) {
-        cen.segs[i].x = trail[trail.length - 1].x;
-        cen.segs[i].y = trail[trail.length - 1].y;
+      var a2 = trail[idx], b2 = trail[Math.min(idx + 1, trail.length - 1)];
+      var dd2 = Math.hypot(b2.x - a2.x, b2.y - a2.y);
+      while (dd2 <= 0 && idx + 1 < trail.length - 1) {
+        idx++; a2 = trail[idx]; b2 = trail[idx + 1];
+        dd2 = Math.hypot(b2.x - a2.x, b2.y - a2.y);
+      }
+      var t = dd2 > 0 ? Math.min(1, (want - acc2) / dd2) : 1;
+      cen.segs[i].x = a2.x + (b2.x - a2.x) * t;
+      cen.segs[i].y = a2.y + (b2.y - a2.y) * t;
+      /* body segments that land on a mushroom drop one row and climb back
+         over it (authentic squirm; does NOT reverse — only head reverses) */
+      var bc = cellOf(cen.segs[i].x), br = cellOf(cen.segs[i].y);
+      if (mushAt(bc, br) && i % 2 === 0 && br < ROWS - 1) {
+        cen.segs[i].y = (br + 1) * CELL;
+        if (cen.segs[i].y > FH) cen.segs[i].y = FH;
       }
     }
   }
@@ -678,7 +732,9 @@
       if (blocker) blocked = true;
 
       if (blocked) {
-        /* ONLY the head drops one row and reverses */
+        /* ONLY the head drops one row and reverses; if the blocker was a
+           mushroom the head also takes a BITE out of it (hp--). Each bite
+           grows the centipede by one tail segment (user spec / worm feel). */
         cen.dir = -cen.dir;
         var dropRow = hr + 1;
         if (dropRow >= ROWS - 1) {
@@ -686,7 +742,30 @@
           return;
         }
         head.y = dropRow * CELL;
-        if (blocker && blocker.poison && !cen.poison) { cen.poison = true; sfx("fiveX"); }
+        if (blocker) {
+          if (blocker.poison && !cen.poison) { cen.poison = true; sfx("fiveX"); }
+          blocker.hp--;
+          cen.chomp = 14;
+          cen.bites++;
+          addScore(1);
+          puff(nc * CELL + 4, hr * CELL + 2, pal().mush, 4);
+          if (blocker.hp <= 0) {
+            delete mush[mkey(blocker.c, blocker.r)];
+            puff(nc * CELL + 4, hr * CELL + 4, blocker.poison ? POISON_COLOR : pal().mush, 6);
+            sfx("mushDown");
+          } else {
+            sfx("bite");
+          }
+          /* GROW: add one tail segment behind the current tail (capped).
+             Keep trail history; pad the tail end so the new segment sits at
+             the old tail position and gets pulled forward naturally. */
+          if (cen.segs.length < cen.maxSegs) {
+            cen.segs.push({ x: head.x, y: head.y });
+            var last = cen.trail[cen.trail.length - 1] || { x: head.x, y: head.y };
+            for (var gi = 0; gi < CELL * 2; gi++) cen.trail.push({ x: last.x, y: last.y });
+            floats.push({ x: nc * CELL + 4, y: hr * CELL - 4, text: "GROW!", color: "#8dff6a", life: 45 });
+          }
+        }
       } else {
         head.x = nc * CELL;
         cen.zig = 1 - cen.zig;
@@ -767,8 +846,13 @@
             var front = cen.segs.slice(0, si);
             var rear = cen.segs.slice(si + 1);
             cen.segs = front; cen.trail = initTrail(front, cen.dir);
+            /* rear half becomes an independent centipede traveling the OPPOSITE
+               direction so the two halves separate immediately (user spec) */
             if (rear.length > 0) {
-              centipedes.push(makeCentipede(rear, cen.dir, initTrail(rear, cen.dir), 0, cen.poison));
+              var rearDir = -cen.dir;
+              var newCen = makeCentipede(rear, rearDir, initTrail(rear, rearDir), 0, cen.poison);
+              newCen.maxSegs = cen.maxSegs;
+              centipedes.push(newCen);
             }
             sfx("segHit");
           }
@@ -1327,24 +1411,48 @@
       var bm = bounceShrooms[k];
       blit(S.bounce, bm.x + CELL / 2, bm.y + CELL / 2);
     }
-    /* centipedes: gradient across segments, alternating leg frames */
+    /* centipedes: elongated capsule body — each segment stretches along
+       the axis toward the head (inchworm crawl), tapers to the tail,
+       head flips with direction and snaps jaws open while chomping.
+       Sprites bake facing left-thick/right-tail, so the local +x axis
+       points backward; rotating by (ax+PI) faces each piece forward. */
     var lf = legFrame;
     for (k = 0; k < centipedes.length; k++) {
       var cen = centipedes[k];
       if (!cen) continue;
       var n = cen.segs.length;
       var bob = cen.acc % CELL;
+      if (cen.chomp > 0 && state === "playing") cen.chomp--;
       for (var si = n - 1; si >= 0; si--) {
         var sg = cen.segs[si];
         var slot = Math.min(25, Math.round(si / Math.max(1, n - 1) * 25));
         var spr;
-        if (si === 0) spr = cen.poison ? S.headPoison : S.head;
-        else {
+        if (si === 0) {
+          spr = (cen.chomp > 0 ? (cen.poison ? S.headPoisonOpen : S.headOpen)
+                               : (cen.poison ? S.headPoison : S.head));
+        } else {
           var fr = (lf + si) % 2;
           spr = (cen.poison ? S.segPoison[slot] : S.seg[slot])[fr];
         }
+        /* axis toward neighbor; degenerate -> straight backward */
+        var nb = si === 0 ? cen.segs[1] : cen.segs[si - 1];
+        var dx = nb ? sg.x - nb.x : -cen.dir * CELL;
+        var dy = nb ? sg.y - nb.y : 0;
+        var dd = Math.hypot(dx, dy);
+        if (dd < 0.5 || dd > CELL * 2) { dx = -cen.dir * CELL; dy = 0; dd = CELL; }
+        var ax = Math.atan2(dy, dx);              /* backward axis */
+        if (si === 0) ax += Math.PI;              /* head jaws face forward */
+        var ch = 1 - (si / Math.max(1, n - 1)) * 0.3;   /* taper to tail */
+        var stretch = si === 0 ? 1 : Math.min(1.25, (dd + CELL * 0.35) / (CELL * 1.9));
         var wob = Math.sin(animT * 10 + si * 0.9) * 0.6;
-        blit(spr, sg.x + CELL / 2 + (si === 0 ? cen.dir * bob * 0.3 : 0), sg.y + CELL / 2 + wob * 0.4);
+        var cx = px(sg.x + CELL / 2 + (si === 0 ? cen.dir * bob * 0.3 : 0));
+        var cy = py(sg.y + CELL / 2 + wob * 0.4);
+        var dw = spr.w * SCALE * stretch, dh = spr.h * SCALE * ch;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(ax);
+        ctx.drawImage(spr.cv, -dw / 2, -dh / 2, dw, dh);
+        ctx.restore();
       }
     }
     for (k = 0; k < spiders.length; k++) blit(S.spider[legFrame % 2], spiders[k].x + CELL / 2, spiders[k].y + CELL / 2);
@@ -1606,6 +1714,7 @@
   window._shotVsCenti = shotVsCenti;
   window._makeCenti = function (segs, dir) { return makeCentipede(segs, dir, null, 0, false); };
   window._forceShoot = function (x, y) { bullets.push({ x: x, y: y + 8 }); updateBullets(); };
+  window._spawnWave = spawnWaveCentipede;
   window._keepAlive = function () { ship.inv = 999999; };
   window._testReset = function () { state = "playing"; ship.alive = true; ship.inv = 999999; };
   window._freeze = function (v) { frozen = !!v; };
